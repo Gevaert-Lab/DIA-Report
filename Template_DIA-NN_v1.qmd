@@ -1,6 +1,6 @@
 ---
 title: "Proteomics Report from DIA-NN result"
-subtitle: "`r params$state`, `r params$year`"
+subtitle: "`r params$year`"
 author: "VIB-CMB : Dr. XXYY"
 format: 
   html:
@@ -265,9 +265,9 @@ pe <- msqrob(object = pe, i = "proteinRS",
 
 
 contrast_list <- paste0(params$comparisons, "=0")
-print(contrast_list)
+#print(contrast_list)
 coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
-print(coef)
+#print(coef)
 
 L <- makeContrast(contrast_list, parameterNames = coef)
 
@@ -278,13 +278,22 @@ L <- makeContrast(contrast_list, parameterNames = coef)
 getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
 
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
-print(params$comparisons)
 
 
 test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 names(test) <- params$comparisons 
 
+
 ```
+
+```{r test}
+names(test)
+#print(test[['GroupB - GroupA']]$r)
+print(test[['GroupB - GroupA']]$p1)
+
+typeof(test[['GroupB - GroupA']]$p1)
+```
+
 
 ## Comparison: `r params$comparisons`
 
@@ -297,7 +306,7 @@ names(test) <- params$comparisons
     cat( '##', paste(cmp,'Volcano plot',sep=' '), '\n\n')
     
     toptable_table_contrast <- test[[cmp]]$r
-    plot(test[[cmp]]$p1)
+    ggplotly(test[[cmp]]$p1)
     
     # DT::datatable( test[[cmp]]$r %>% arrange(adjPval)  ,
     #              extensions = c('FixedColumns', 'Scroller'),
@@ -317,4 +326,9 @@ names(test) <- params$comparisons
 
 ```
 :::
+
+## Session Info
+```{r }
+sessionInfo()
+```
 

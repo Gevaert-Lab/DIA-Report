@@ -10,4 +10,4 @@ Automatic report tool for DE analysis  DIA proteomics data
 
 
 ## How to use it 
-`quarto render .\Template_DIA-NN_v1.qmd --execute-params parameters.yam`
+`quarto render .\Template_DIA-NN_v1.qmd --execute-params parameters.yaml`
