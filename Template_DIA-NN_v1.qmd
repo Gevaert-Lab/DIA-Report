@@ -1,0 +1,320 @@
+---
+title: "Proteomics Report from DIA-NN result"
+subtitle: "`r params$state`, `r params$year`"
+author: "VIB-CMB : Dr. XXYY"
+format: 
+  html:
+    fig-width: 10
+    fig-height: 8
+    toc: true
+execute: 
+  echo: false
+  warning: false
+embed-resources: true
+theme: "cosmo"
+params:
+  description: ""
+  year: "" 
+  formula: ""
+  comparisons: ""
+  contrast: ""
+  input_file: ""
+  design_file: ""
+  FC_thr: 1
+  adjpval_thr: 0.05
+---
+
+
+```{r input}
+ #| output: false
+
+library(QFeatures)
+library(msqrob2)
+library(readxl)
+library(SummarizedExperiment)
+library(visdat)
+library(dplyr)
+library(tidyverse)
+library(magrittr)
+library(here)
+library(tidyr)
+library(plotly)
+library(DT)
+library(MSnbase)
+library(factoextra)
+library(visdat)
+library(hrbrthemes)
+library(ggVennDiagram)
+library(gridExtra)
+library(biomaRt)
+```
+
+
+## Experiment 
+
+`r params$description`
+
+
+## Import data 
+
+```{r functions}
+ dfToWideMsqrob <- function(data, precursorquan) {
+   data %>%
+     filter(
+       PG.Q.Value <= 0.01 &
+         Q.Value <= 0.01 &
+         Precursor.Id != "" & 
+         .data[[precursorquan]] > 0
+     ) %>%
+     dplyr::select(
+       File.Name, 
+       Precursor.Id, 
+       Modified.Sequence, 
+       Stripped.Sequence, 
+       Protein.Group,
+       Protein.Ids, 
+       Protein.Names, 
+       Genes, 
+       Proteotypic,
+       First.Protein.Description,
+       .data[[precursorquan]]
+     ) %>%
+     tidyr::pivot_wider(
+       names_from = File.Name,
+       values_from = .data[[precursorquan]]
+     )
+ }
+
+DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
+  #quantile_protein
+  #data_selector= 'batch_corrected'
+  cmp = label
+  all_res <-  rowData(data[["proteinRS"]])[[label]]
+  
+  all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
+  all_res <- all_res[ ! is.na(all_res$adjPval),]
+  all_res$differential_expressed <- "NO"
+  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
+  all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
+  
+  p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , label = all_res$Protein.names  )  )  +
+    geom_point() +
+    theme_minimal() +
+    #geom_text_repel() +
+    geom_vline(xintercept = c(-1, 1),col="grey") +
+    geom_hline(yintercept = -log10(0.05),col="grey") +
+    scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+    ggtitle(paste0("Volcano ",cmp) )
+  
+  DEall <- all_res[!is.na(all_res$adjPval) ,c("adjPval","pval","logFC","differential_expressed")]
+  return ( list( r =DEall , pl = p1) )
+}
+
+```
+
+
+```{r import data}
+  # 'peptidesRCB.txt'  
+
+  data <- read.csv(params$input_file,sep='\t')
+  annotation <-  read.csv(params$design_file)
+
+
+ dfMsqrob <- dfToWideMsqrob( data, precursorquan = "Precursor.Translated")
+
+ 
+  samplenames <- tibble(
+   filename = names(dfMsqrob)[str_which(names(dfMsqrob), ".mzML")], 
+   samplename =  gsub('.mzML','',basename(filename) ) )
+ 
+ names(dfMsqrob)[str_which(names(dfMsqrob), ".mzML")] <- samplenames$samplename
+ 
+
+
+```
+
+## Creating Q-Features Obj
+```{r preparation }
+
+ pe <- readQFeatures(table = dfMsqrob,
+                     fnames = "Precursor.Id",
+                     ecol = str_starts(names(dfMsqrob), 'B'),
+                     name = "precursor")
+
+
+colData(pe)$Group <- factor(annotation$group)
+colData(pe)$Replicate <- factor(annotation$replicate)
+colData(pe)$SampleName <- annotation$sample
+
+
+rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
+  assay %>%
+  is.na %>%
+  not %>%
+  rowSums
+
+rowData(pe[["precursor"]])$pep_per_prot <-
+  left_join(rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
+            rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
+              summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
+
+```
+
+## Pre-processing :
+
+```{r pre_processing}
+
+pe <- filterFeatures(pe, ~ nNonZero >= 2)
+# nrow(pe[["precursor"]]) # 153207 precursors
+# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 19534 proteins
+
+# Proteotypic features
+pe <- filterFeatures(pe, ~ Proteotypic == 1)
+# nrow(pe[["precursor"]]) # 145712
+# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 17105
+
+# At least 2 peptides per protein across all groups
+pe <- filterFeatures(pe, ~ pep_per_prot > 3)
+# nrow(pe[["precursor"]]) # 139581
+# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 12034
+
+
+
+pe <- logTransform(pe, base = 2, i = "precursor",
+                   name = "precursorLog")
+
+pe <- normalize(pe,  method = "quantiles", i = "precursorLog",
+                name = "precursorNorm")
+
+
+pe <- aggregateFeatures(pe, i = "precursorNorm",
+                        fcol = "Protein.Ids",
+                        name = "proteinRS",
+                        na.rm = TRUE)
+```
+
+## Data Missing Analysis
+
+```{r missing_val_analysis}
+peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
+  xlab("Precursor index (ordered by data completeness)") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(strip.text.x = element_blank(),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.position=c(.35,.15)
+  )
+
+proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
+  xlab("Protein index (ordered by data completeness)") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(strip.text.x = element_blank(),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.position=c(.35,.15)
+  )
+
+missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
+print(missingness)
+
+```
+
+## Normalization 
+
+```{r normalization_plot}
+par(mfrow=c(1,3))
+limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transform')
+limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
+limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization ' )
+
+
+```
+## PCA 
+
+
+```{r pca_plot}
+
+pca_ <-
+  pe[["proteinRS"]] %>%
+  filterNA() %>%
+  assay() %>%
+  t() %>%
+  prcomp() %>%
+  fviz_pca_ind(habillage = colData(pe)$Group  , geom=c("point"), addEllipses=FALSE, repel = FALSE ,title = "PCA by Group")
+plot(pca_)
+
+
+pca_ <-
+  pe[["proteinRS"]] %>%
+  filterNA() %>%
+  assay() %>%
+  t() %>%
+  prcomp() %>%
+  fviz_pca_ind(habillage = colData(pe)$Replicate, geom=c("point"), addEllipses=FALSE,  repel = TRUE ,title = "PCA by Replicate")
+plot(pca_)
+
+
+```
+
+## DE Analysis 
+
+```{r build_model}
+
+pe <- msqrob(object = pe, i = "proteinRS", 
+             formula = ~ -1 +Group  ,ridge = FALSE, overwrite = TRUE)
+
+
+contrast_list <- paste0(params$comparisons, "=0")
+print(contrast_list)
+coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+print(coef)
+
+L <- makeContrast(contrast_list, parameterNames = coef)
+
+# L <- makeContrast(c( "ridgeGroupB - ridgeGroupA = 0"), parameterNames = c("ridgeGroupB","ridgeGroupA"))
+# rownames(L) <- paste0("ridge",rownames(L))
+
+
+getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
+
+pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
+print(params$comparisons)
+
+
+test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
+names(test) <- params$comparisons 
+
+```
+
+## Comparison: `r params$comparisons`
+
+::: {.panel-tabset}
+
+```{r}
+#| results: asis
+
+  for (cmp in names(test)) {
+    cat( '##', paste(cmp,'Volcano plot',sep=' '), '\n\n')
+    
+    toptable_table_contrast <- test[[cmp]]$r
+    plot(test[[cmp]]$p1)
+    
+    # DT::datatable( test[[cmp]]$r %>% arrange(adjPval)  ,
+    #              extensions = c('FixedColumns', 'Scroller'),
+    #              options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
+    #                             scroller = TRUE, dom = 'Bfrtip',
+    #                             autoWidth = TRUE
+    #              ),
+    #  ) %>% formatStyle(
+    # 'differential_expressed',
+    #   target = 'row',
+    #   backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f')))
+     
+    
+    cat('\n\n')
+    
+  }
+
+```
+:::
+

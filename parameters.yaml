@@ -1,0 +1,7 @@
+year: 2024
+description: 'yest and USP2 proteins spiked in different concentration. Experiment is designed for DIA benchmarking of different workflow using DIA-NN.'
+input_file: 'report.tsv'
+design_file: 'annotation_DIA_dummy.csv'
+formula: ''
+contrast: 'Group'
+comparisons: ['GroupB - GroupA','GroupC - GroupA']
