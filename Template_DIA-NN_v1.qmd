@@ -22,6 +22,9 @@ params:
   design_file: ""
   FC_thr: 1
   adjpval_thr: 0.05
+  Proteotypic: TRUE
+  pep_per_prot: 3
+  nNonZero: 3
 ---
 
 
@@ -40,6 +43,7 @@ library(here)
 library(tidyr)
 library(plotly)
 library(DT)
+library(tibble)
 library(MSnbase)
 library(factoextra)
 library(visdat)
@@ -101,15 +105,40 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
     geom_point() +
     theme_minimal() +
     #geom_text_repel() +
-    geom_vline(xintercept = c(-1, 1),col="grey") +
-    geom_hline(yintercept = -log10(0.05),col="grey") +
+    geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+    geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
     scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
     ggtitle(paste0("Volcano ",cmp) )
   
   DEall <- all_res[!is.na(all_res$adjPval) ,c("adjPval","pval","logFC","differential_expressed")]
-  return ( list( r =DEall , pl = p1) )
+  return ( list( toptable =DEall , volcano = p1) )
 }
 
+ render_child <- function(data, template) {
+   res = knitr::knit_child(
+    text = xfun::read_utf8( template),
+    envir = rlang::env(data = data),
+    quiet = TRUE
+   )
+   cat(res, sep = '\n')
+  cat("\n")
+ }
+
+
+```
+
+```{r check_parameter}
+
+if (params$contrast == '' ){
+  stop("Check parameter file: contrast is not set" )
+}
+
+if (all(params$comparisons == '') ){
+  stop("Check parameter file: comparisons is not set" )
+}
+
+
+## to do visualize input data 
 ```
 
 
@@ -133,7 +162,8 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
 
 ```
 
-## Creating Q-Features Obj
+## Creating Q-Features object and run pre processing
+
 ```{r preparation }
 
  pe <- readQFeatures(table = dfMsqrob,
@@ -160,21 +190,29 @@ rowData(pe[["precursor"]])$pep_per_prot <-
 
 ```
 
-## Pre-processing :
+The pre- processing steps are:
+
+ - Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples 
+ - Select only **proteotypic peptides** 
+ - Select proteins with at least **`r params$pep_per_prot` peptides**
 
 ```{r pre_processing}
 
-pe <- filterFeatures(pe, ~ nNonZero >= 2)
+pe <- filterFeatures(pe, ~ nNonZero >= params$nNonZero)
 # nrow(pe[["precursor"]]) # 153207 precursors
 # length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 19534 proteins
 
 # Proteotypic features
-pe <- filterFeatures(pe, ~ Proteotypic == 1)
+
+if (params$Proteotypic){
+  pe <- filterFeatures(pe, ~ Proteotypic == 1)
 # nrow(pe[["precursor"]]) # 145712
 # length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 17105
+}
+
 
 # At least 2 peptides per protein across all groups
-pe <- filterFeatures(pe, ~ pep_per_prot > 3)
+pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 # nrow(pe[["precursor"]]) # 139581
 # length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 12034
 
@@ -214,8 +252,8 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
         legend.position=c(.35,.15)
   )
 
-missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
-print(missingness)
+#missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
+#print(missingness)
 
 ```
 
@@ -225,7 +263,7 @@ print(missingness)
 par(mfrow=c(1,3))
 limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transform')
 limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
-limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization ' )
+limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization' )
 
 
 ```
@@ -257,6 +295,7 @@ plot(pca_)
 ```
 
 ## DE Analysis 
+Using MSqRob2.
 
 ```{r build_model}
 
@@ -286,46 +325,46 @@ names(test) <- params$comparisons
 
 ```
 
-```{r test}
-names(test)
-#print(test[['GroupB - GroupA']]$r)
-print(test[['GroupB - GroupA']]$p1)
 
-typeof(test[['GroupB - GroupA']]$p1)
+
+## QC plots :
+::: {.panel-tabset}
+
+```{r QC_plot}
+#| results: asis
+  for (cmp in names(test)) {
+    cat( '##', paste(cmp,' P-values distribution ',sep=' '), '\n\n')
+    
+    render_child(data = test[[cmp]],template='_templatePval_distribution.Rmd') 
+    cat('\n\n')
+    
+  }
+
 ```
 
+:::
 
-## Comparison: `r params$comparisons`
+## Group Comparison :  
 
 ::: {.panel-tabset}
 
-```{r}
+```{r comparison}
 #| results: asis
 
   for (cmp in names(test)) {
-    cat( '##', paste(cmp,'Volcano plot',sep=' '), '\n\n')
+    cat( '##', paste(cmp,' Volcano plot',sep=' '), '\n\n')
     
-    toptable_table_contrast <- test[[cmp]]$r
-    ggplotly(test[[cmp]]$p1)
+
     
-    # DT::datatable( test[[cmp]]$r %>% arrange(adjPval)  ,
-    #              extensions = c('FixedColumns', 'Scroller'),
-    #              options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
-    #                             scroller = TRUE, dom = 'Bfrtip',
-    #                             autoWidth = TRUE
-    #              ),
-    #  ) %>% formatStyle(
-    # 'differential_expressed',
-    #   target = 'row',
-    #   backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f')))
-     
-    
+    render_child(data = test[[cmp]],template='_templateContrast.Rmd') 
     cat('\n\n')
     
   }
 
 ```
 :::
+
+
 
 ## Session Info
 ```{r }

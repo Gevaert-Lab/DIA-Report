@@ -1,0 +1,10 @@
+
+
+```{r}
+
+
+data$toptable %>% ggplot( aes(x=pval,)) +
+    geom_histogram(binwidth=.02, alpha=.7, position="identity")
+
+
+```

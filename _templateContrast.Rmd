@@ -1,0 +1,19 @@
+
+
+```{r}
+library(plotly)
+ggplotly(data$volcano)
+
+cat('Differantial Expressed Proteins \n')
+library(DT)
+DT::datatable( data$toptable %>% arrange(adjPval)  ,
+             extensions = c('FixedColumns', 'Scroller'),
+             options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
+                            scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
+             ),
+ ) %>% formatStyle(
+   'differential_expressed',
+   target = 'row',
+    backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f')))
+
+```
