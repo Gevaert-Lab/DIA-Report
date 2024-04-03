@@ -4,7 +4,14 @@
 library(plotly)
 ggplotly(data$volcano)
 
-cat('Differantial Expressed Proteins \n')
+
+png(filename= file.path(path,paste0("Volcano",".png")), width=10, height=8, res=200, units="in")
+
+data$volcano
+
+invisible(dev.off())
+
+cat('Differential Expressed Proteins \n')
 library(DT)
 DT::datatable( data$toptable %>% arrange(adjPval)  ,
              extensions = c('FixedColumns', 'Scroller'),
@@ -15,5 +22,8 @@ DT::datatable( data$toptable %>% arrange(adjPval)  ,
    'differential_expressed',
    target = 'row',
     backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f')))
+
+ttable <- data$toptable %>% arrange(adjPval) %>% dplyr::select(- differential_expressed)
+write.csv2(ttable, file= file.path(path,paste0("Toptable",".csv")))
 
 ```

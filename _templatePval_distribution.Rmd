@@ -6,5 +6,12 @@
 data$toptable %>% ggplot( aes(x=pval,)) +
     geom_histogram(binwidth=.02, alpha=.7, position="identity")
 
+png(filename= file.path(path,paste0("P_val_Distribution",".png")), width=10, height=8, res=200, units="in")
+
+data$toptable %>% ggplot( aes(x=pval,)) +
+    geom_histogram(binwidth=.02, alpha=.7, position="identity")
+
+invisible(dev.off())
+
 
 ```

@@ -1,7 +1,7 @@
 ---
-title: "Proteomics Report from DIA-NN result"
-subtitle: "`r params$year`"
-author: "VIB-CMB : Dr. XXYY"
+title: "Proteomics Report: `r params$title`"
+subtitle: "`r params$subtitle`"
+author: "`r params$author`"
 format: 
   html:
     fig-width: 10
@@ -14,7 +14,9 @@ embed-resources: true
 theme: "cosmo"
 params:
   description: ""
-  year: "" 
+  title: ""
+  subtitle: ""
+  author: "" 
   formula: ""
   comparisons: ""
   contrast: ""
@@ -25,6 +27,8 @@ params:
   Proteotypic: TRUE
   pep_per_prot: 3
   nNonZero: 3
+  aggr_method: ""
+  normalization: ""
 ---
 
 
@@ -59,7 +63,6 @@ library(biomaRt)
 `r params$description`
 
 
-## Import data 
 
 ```{r functions}
  dfToWideMsqrob <- function(data, precursorquan) {
@@ -114,14 +117,24 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   return ( list( toptable =DEall , volcano = p1) )
 }
 
- render_child <- function(data, template) {
-   res = knitr::knit_child(
-    text = xfun::read_utf8( template),
-    envir = rlang::env(data = data),
-    quiet = TRUE
-   )
-   cat(res, sep = '\n')
-  cat("\n")
+ render_child <- function(data, path, pe, sample_rel,  template) {
+   if (missing(pe)  ){
+     res = knitr::knit_child(
+      text = xfun::read_utf8( template),
+      envir = rlang::env(data = data, path = path),
+      quiet = TRUE
+     )
+     cat(res, sep = '\n')
+    cat("\n")
+   }else{
+      res = knitr::knit_child(
+      text = xfun::read_utf8( template),
+      envir = rlang::env(data = data, pe = pe, sample_rel = sample_rel, params =params, path = path),
+      quiet = TRUE
+     )
+     cat(res, sep = '\n')
+    cat("\n")
+    }
  }
 
 
@@ -137,9 +150,24 @@ if (all(params$comparisons == '') ){
   stop("Check parameter file: comparisons is not set" )
 }
 
+if ( ! params$aggr_method %in% c('robustSummary','medianPolish')) {
+  stop('normalization method not allowed.  Methods allowed are : [ robustSummary, medianPolish ]' )
+}
+if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", "quantiles","quantiles.robust","vsn") ){ 
+   stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
+  } 
+  ## to do visualize input data 
 
-## to do visualize input data 
+if (!dir.exists(file.path(".","Result"))){
+  dir.create('./Result')
+}
+
 ```
+## Import data 
+
+Reading DIA data from **`r params$input_file`** using *Precursor.Translated* intensities from DIA-NN.
+
+All the precursors with *Q-value < 0.01* are used for the analysis.
 
 
 ```{r import data}
@@ -193,7 +221,7 @@ rowData(pe[["precursor"]])$pep_per_prot <-
 The pre- processing steps are:
 
  - Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples 
- - Select only **proteotypic peptides** 
+ - `r if (params$Proteotypic) 'Select only proteotypic peptides' else 'Select both not and proteotypic peptides'`
  - Select proteins with at least **`r params$pep_per_prot` peptides**
 
 ```{r pre_processing}
@@ -221,13 +249,14 @@ pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 pe <- logTransform(pe, base = 2, i = "precursor",
                    name = "precursorLog")
 
-pe <- normalize(pe,  method = "quantiles", i = "precursorLog",
+pe <- normalize(pe,  method = params$normalization, i = "precursorLog",
                 name = "precursorNorm")
 
 
 pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fcol = "Protein.Ids",
                         name = "proteinRS",
+                        fun = params$aggr_method,
                         na.rm = TRUE)
 ```
 
@@ -259,6 +288,13 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 
 ## Normalization 
 
+Raw intensities from DIA-NN are processed as follow:
+
+ - Log 2 transformed 
+ - Normalized across all the samples using **`r params$normalization`** method
+ - Summarization at protein level using **`r params$aggr_methods`** function
+
+
 ```{r normalization_plot}
 par(mfrow=c(1,3))
 limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transform')
@@ -267,10 +303,15 @@ limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summari
 
 
 ```
+
+
 ## PCA 
 
 
 ```{r pca_plot}
+
+# to do make in for loop for a set of variable
+plot_c<- 1
 
 pca_ <-
   pe[["proteinRS"]] %>%
@@ -281,6 +322,11 @@ pca_ <-
   fviz_pca_ind(habillage = colData(pe)$Group  , geom=c("point"), addEllipses=FALSE, repel = FALSE ,title = "PCA by Group")
 plot(pca_)
 
+png(filename= file.path(".","Result",paste0("PCA_",plot_c ,".png")), width=10, height=8, res=200, units="in")
+plot(pca_)
+invisible(dev.off())
+
+plot_c <- plot_c + 1
 
 pca_ <-
   pe[["proteinRS"]] %>%
@@ -291,10 +337,14 @@ pca_ <-
   fviz_pca_ind(habillage = colData(pe)$Replicate, geom=c("point"), addEllipses=FALSE,  repel = TRUE ,title = "PCA by Replicate")
 plot(pca_)
 
+png(filename= file.path(".","Result",paste0("PCA_",plot_c ,".png")), width=10, height=8, res=200, units="in")
+plot(pca_)
+invisible(dev.off())
 
 ```
 
 ## DE Analysis 
+
 Using MSqRob2.
 
 ```{r build_model}
@@ -322,12 +372,21 @@ pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE
 test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 names(test) <- params$comparisons 
 
+# make a subfolder for each contrast
+if (!dir.exists(file.path(".","Result","Contrast"))){
+  dir.create(file.path(".","Result","Contrast"))
+}
+for (a in params$comparisons){
+  dir.create(file.path(".","Result","Contrast",a))
+}
+
 
 ```
 
 
 
-## QC plots :
+## QC plots
+
 ::: {.panel-tabset}
 
 ```{r QC_plot}
@@ -335,7 +394,7 @@ names(test) <- params$comparisons
   for (cmp in names(test)) {
     cat( '##', paste(cmp,' P-values distribution ',sep=' '), '\n\n')
     
-    render_child(data = test[[cmp]],template='_templatePval_distribution.Rmd') 
+    render_child(data = test[[cmp]], path=file.path(".","Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
@@ -344,7 +403,7 @@ names(test) <- params$comparisons
 
 :::
 
-## Group Comparison :  
+## Group Comparison   
 
 ::: {.panel-tabset}
 
@@ -356,8 +415,18 @@ names(test) <- params$comparisons
     
 
     
-    render_child(data = test[[cmp]],template='_templateContrast.Rmd') 
+    render_child(data = test[[cmp]],path=file.path(".","Result","Contrast",cmp),  template='_templateContrast.Rmd') 
     cat('\n\n')
+    
+    filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
+    print(filt_val)   
+    render_child(data = test[[cmp]], pe = pe
+                 ,sample_rel = filt_val,
+                 path= file.path(".","Result","Contrast",cmp),
+                 template='_templateHeatmap.Rmd')
+    cat('\n\n')
+    
+    
     
   }
 
