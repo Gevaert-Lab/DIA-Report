@@ -3,6 +3,7 @@
 ```{r}
 library(pheatmap)
 library(dplyr)
+#library(d3heatmap)
 
 selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))%>% rownames_to_column(var = "rowname") %>% pull(rowname) 
 
@@ -12,19 +13,27 @@ app <- as.data.frame(colData(pe)) %>% filter( Group %in% sample_rel)%>% dplyr::s
 
 data <-  assay(pe[["proteinRS"]])[selected,rownames(app)]
 
-pheatmap::pheatmap(data,
-                         cluster_rows = TRUE,
-                         scale = 'row',
-                         show_rownames = TRUE,
-                        show_colnames = FALSE,
-                         annotation_col = app,
-                         cluster_cols = TRUE,
-                         fontsize_row = 10,
-                         fontsize_col = 11,
-                         width = 12,
-                         height = 10,
-                         main = 'Heatmap')
-  #print(p)
+heatmap(data)
+
+#d3heatmap::d3heatmap(data, scale = "row", colors = "Spectral" )
+
+
+# pdf(file = file.path(path,paste0("Heatmap_DE_protein",".pdf")))
+# p = pheatmap::pheatmap(data,
+#                           cluster_rows = TRUE,
+#                           scale = 'row',
+#                          show_rownames = TRUE,
+#                         show_colnames = FALSE,
+#                          annotation_col = app,
+#                          cluster_cols = TRUE,
+#                          fontsize_row = 10,
+#                          fontsize_col = 11,
+#                          width = 20,
+#                          height = 20,
+#                          main = 'Heatmap')
+# 
+# print(p)
+# invisible(dev.off())
 
 
 ```

@@ -7,6 +7,7 @@ format:
     fig-width: 10
     fig-height: 8
     toc: true
+    css: style.css
 execute: 
   echo: false
   warning: false
@@ -30,6 +31,35 @@ params:
   aggr_method: ""
   normalization: ""
 ---
+
+<style>
+#logo
+{
+    position: relative;
+}
+#logo img {
+    /*position: relative;*/
+    top: 25px;
+    /*right: 0px;*/
+    left: 50px;
+    position: fixed;
+    width: 125px;
+    }
+#header .btn-group {
+    display: none;
+}
+body
+{
+    position: absolute;
+    top: 150px;
+}
+</style>
+
+<div id="logo" align="top">
+```{r echo = FALSE}
+knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg')
+```
+</div>
 
 
 ```{r input}
@@ -436,7 +466,7 @@ for (a in params$comparisons){
 
 
 ## Session Info
-```{r }
+```{r session_info }
 sessionInfo()
 ```
 
