@@ -13,6 +13,7 @@ execute:
   warning: false
 embed-resources: true
 theme: "cosmo"
+title-block-banner: "#27445C"
 params:
   description: ""
   title: ""
