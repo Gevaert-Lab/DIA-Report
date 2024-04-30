@@ -4,7 +4,7 @@ author: 'Andrea'
 description: 'Yeast as background and USP2 proteins spiked in different concentration. This Experiment is designed for DIA benchmarking of different workflow using DIA-NN.'
 input_file: 'data/report.tsv'
 design_file: 'data/annotation_DIA_dummy.csv'
-formula: ''
+formula: '~ -1 + Group'
 contrast: 'Group'
 aggr_method: 'robustSummary' # medianPolish robustSummary() ; base::colMeans() matrixStats::colMedians() base::colSums()
 normalization: 'quantiles' # "sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", ⁠"quantiles⁠", ⁠"quantiles.robust⁠" or "vsn"

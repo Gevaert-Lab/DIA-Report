@@ -13,7 +13,7 @@ execute:
   warning: false
 embed-resources: true
 theme: "cosmo"
-title-block-banner: "#27445C"
+title-block-banner: "#5a2a82 "
 params:
   description: ""
   title: ""
@@ -33,34 +33,34 @@ params:
   normalization: ""
 ---
 
-<style>
-#logo
-{
-    position: relative;
-}
-#logo img {
-    /*position: relative;*/
-    top: 25px;
-    /*right: 0px;*/
-    left: 50px;
-    position: fixed;
-    width: 125px;
-    }
-#header .btn-group {
-    display: none;
-}
-body
-{
-    position: absolute;
-    top: 150px;
-}
-</style>
+<!-- <style> -->
+<!-- #logo -->
+<!-- { -->
+<!--     position: relative; -->
+<!-- } -->
+<!-- #logo img { -->
+<!--     /*position: relative;*/ -->
+<!--     top: 25px; -->
+<!--     /*right: 0px;*/ -->
+<!--     left: 50px; -->
+<!--     position: fixed; -->
+<!--     width: 125px; -->
+<!--     } -->
+<!-- #header .btn-group { -->
+<!--     display: none; -->
+<!-- } -->
+<!-- body -->
+<!-- { -->
+<!--     position: absolute; -->
+<!--     top: 150px; -->
+<!-- } -->
+<!-- </style> -->
 
-<div id="logo" align="top">
-```{r echo = FALSE}
-knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg')
-```
-</div>
+<!-- <div id="logo" align="top"> -->
+<!-- ```{r echo = FALSE} -->
+<!-- knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg') -->
+<!-- ``` -->
+<!-- </div> -->
 
 
 ```{r input}
@@ -128,14 +128,18 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   #data_selector= 'batch_corrected'
   cmp = label
   all_res <-  rowData(data[["proteinRS"]])[[label]]
+  all_res <- all_res %>% rownames_to_column(var = 'Uniprot_id' )
+  temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names ) 
+  all_res <-  all_res %>% left_join( temp, by=join_by(Uniprot_id)) 
   
-  all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
+  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
   all_res <- all_res[ ! is.na(all_res$adjPval),]
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
   all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
   
-  p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , label = all_res$Protein.names  )  )  +
+  p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                          text = sprintf("Protein_name: %s <br> Gene_symbol: %s",   all_res$Protein.Names, all_res$Genes)   )  )  +
     geom_point() +
     theme_minimal() +
     #geom_text_repel() +
@@ -144,12 +148,13 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
     scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
     ggtitle(paste0("Volcano ",cmp) )
   
-  DEall <- all_res[!is.na(all_res$adjPval) ,c("adjPval","pval","logFC","differential_expressed")]
+  DEall <- all_res[!is.na(all_res$adjPval) ,c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed")]
   return ( list( toptable =DEall , volcano = p1) )
 }
 
  render_child <- function(data, path, pe, sample_rel,  template) {
    if (missing(pe)  ){
+     # _templateContrast.Rmd _templateBArPlot.Rmd
      res = knitr::knit_child(
       text = xfun::read_utf8( template),
       envir = rlang::env(data = data, path = path),
@@ -158,6 +163,7 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
      cat(res, sep = '\n')
     cat("\n")
    }else{
+     # _templateHeatmap.Rmd
       res = knitr::knit_child(
       text = xfun::read_utf8( template),
       envir = rlang::env(data = data, pe = pe, sample_rel = sample_rel, params =params, path = path),
@@ -293,6 +299,8 @@ pe <- aggregateFeatures(pe, i = "precursorNorm",
 
 ## Data Missing Analysis
 
+The plot shows the completness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins  are  ordered based on the increasing NA content. 
+
 ```{r missing_val_analysis}
 peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
   xlab("Precursor index (ordered by data completeness)") +
@@ -301,7 +309,7 @@ peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  )
+  ) +   ggtitle("Missingness - precursor level" )
 
 proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   xlab("Protein index (ordered by data completeness)") +
@@ -310,9 +318,9 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  )
+  ) +   ggtitle("Missingness - protein level")
 
-#missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
+missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
 #print(missingness)
 
 ```
@@ -321,9 +329,9 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 
 Raw intensities from DIA-NN are processed as follow:
 
- - Log 2 transformed 
+ - Log 2 transformation 
  - Normalized across all the samples using **`r params$normalization`** method
- - Summarization at protein level using **`r params$aggr_methods`** function
+ - Summarization at protein level using **`r params$aggr_method`** function
 
 
 ```{r normalization_plot}
@@ -372,6 +380,7 @@ png(filename= file.path(".","Result",paste0("PCA_",plot_c ,".png")), width=10, h
 plot(pca_)
 invisible(dev.off())
 
+
 ```
 
 ## DE Analysis 
@@ -381,7 +390,7 @@ Using MSqRob2.
 ```{r build_model}
 
 pe <- msqrob(object = pe, i = "proteinRS", 
-             formula = ~ -1 +Group  ,ridge = FALSE, overwrite = TRUE)
+             formula = as.formula( params$formula)  ,ridge = FALSE, overwrite = TRUE)
 
 
 contrast_list <- paste0(params$comparisons, "=0")
@@ -410,6 +419,7 @@ if (!dir.exists(file.path(".","Result","Contrast"))){
 for (a in params$comparisons){
   dir.create(file.path(".","Result","Contrast",a))
 }
+
 
 
 ```
@@ -443,6 +453,7 @@ for (a in params$comparisons){
 
   for (cmp in names(test)) {
     cat( '##', paste(cmp,' Volcano plot',sep=' '), '\n\n')
+    cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
 
     
@@ -450,13 +461,19 @@ for (a in params$comparisons){
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
-    print(filt_val)   
+    #print(filt_val)   
     render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
                  path= file.path(".","Result","Contrast",cmp),
                  template='_templateHeatmap.Rmd')
     cat('\n\n')
-    
+    cat('These bar plots summarizes the number of significantly upregulated/downregulated number of miRNAs based on
+different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) 
+and log2 fold-change thresholds (on the x-axis) used to define the significance levels. ')
+    render_child(data = test[[cmp]],
+                 path= file.path(".","Result","Contrast",cmp),
+                 template='_templateBarPlot.Rmd')
+    cat('\n\n')
     
     
   }
