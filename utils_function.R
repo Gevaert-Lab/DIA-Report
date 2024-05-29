@@ -1,0 +1,164 @@
+
+######
+check_design_data  <- function  (data_ , design){
+  
+  status <- 0
+  type_raw <- NA
+  error <-
+  
+  
+  ## check if precursor. translated is there  
+  min_col_need <- c("Precursor.Translated","Precursor.Normalised","Proteotypic","PG.Q.Value",
+                  "Q.Value","Precursor.Id") 
+  if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
+    
+     #cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' )  
+     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' ) )
+    
+     status <- 1
+     #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
+     return( list(status=status, type_raw=type_raw,error=error))
+  }
+  
+  min_col_need_design <- c("sample","run", "group", "replicate") 
+  if  ( ! all( min_col_need_design %in% colnames(design)) == TRUE){
+    #cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' )  
+    #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
+    error <-  capture.output(cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' ))
+    status <- 1
+    return(list(status=status, type_raw=type_raw,error=error))
+  }
+  
+  data_sample <- data %>% dplyr::distinct(File.Name) %>% pull()
+  d_sample <- design %>% dplyr::select(sample) %>% pull()
+  
+  type_raw <- ''
+     
+  if (! length(data_sample) == length(d_sample)){
+    #cat ( 'Number of samples in the design file and in DIA-NN does not match')
+    error <- 'Number of samples in the design file and in DIA-NN does not match'
+    status <- 1
+    return(list(status=status, type_raw=type_raw,error=error))
+  }
+  
+  # no error exit 
+  #str_match(data_sample,'\\..*')
+  type_raw <- str_match(data_sample,'\\..*')[,1][1]
+  
+  return(list(status=status, type_raw=type_raw))
+  
+}
+
+######
+dfToWideMsqrob <- function(data, precursorquan) {
+  data %>%
+    filter(
+      PG.Q.Value <= 0.01 &
+        Q.Value <= 0.01 &
+        Precursor.Id != "" & 
+        .data[[precursorquan]] > 0
+    ) %>%
+    dplyr::select(
+      File.Name, 
+      Precursor.Id, 
+      Modified.Sequence, 
+      Stripped.Sequence, 
+      Protein.Group,
+      Protein.Ids, 
+      Protein.Names, 
+      Genes, 
+      Proteotypic,
+      First.Protein.Description,
+      .data[[precursorquan]]
+    ) %>%
+    tidyr::pivot_wider(
+      names_from = File.Name,
+      values_from = .data[[precursorquan]]
+    )
+}
+
+######
+
+DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
+  #quantile_protein
+  #data_selector= 'batch_corrected'
+  cmp = label
+  all_res <-  rowData(data[["proteinRS"]])[[label]]
+  all_res <- all_res %>% rownames_to_column(var = 'Uniprot_id' )
+  
+  if ( all( head(params$ensembl_col,-1) %in%  names(rowData(pe[['proteinRS']]))  )  ){
+    temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names, head(params$ensembl_col,-1) ) 
+    
+  }else{
+    temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names ) 
+  }
+  
+  
+  all_res <-  all_res %>% left_join( temp, by=join_by(Uniprot_id)) 
+  
+  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
+  all_res <- all_res[ ! is.na(all_res$adjPval),]
+  all_res$differential_expressed <- "NO"
+  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
+  all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
+  
+  if ( all( head(params$ensembl_col,-1) %in%  names(rowData(pe[['proteinRS']]))  )  ) {
+    ## adding ensemble annotation
+    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s  <br> Chromosome name: %s",   all_res$Protein.Names, all_res$Genes,all_res$chromosome_name)   )  )  +
+      geom_point() +
+      theme_minimal() +
+      #geom_text_repel() +
+      geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+      geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+      scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+      ggtitle(paste0("Volcano ",cmp) )
+    
+    DEall <- all_res[!is.na(all_res$adjPval) ,append(c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed"),head(params$ensembl_col,-1) ) ]
+    
+      }else{
+
+    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s",   all_res$Protein.Names, all_res$Genes)   )  )  +
+      geom_point() +
+      theme_minimal() +
+      #geom_text_repel() +
+      geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+      geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+      scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+      ggtitle(paste0("Volcano ",cmp) )
+    
+    DEall <- all_res[!is.na(all_res$adjPval) ,c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed")]
+    
+    
+  }
+  return ( list( toptable =DEall , volcano = p1) )
+}
+
+
+####
+
+render_child <- function(data, path, pe, sample_rel,  template) {
+  if (missing(pe)  ){
+    # _templateContrast.Rmd _templateBArPlot.Rmd
+    res = knitr::knit_child(
+      text = xfun::read_utf8( template),
+      envir = rlang::env(data = data, path = path),
+      quiet = TRUE
+    )
+    cat(res, sep = '\n')
+    cat("\n")
+  }else{
+    # _templateHeatmap.Rmd
+    res = knitr::knit_child(
+      text = xfun::read_utf8( template),
+      envir = rlang::env(data = data, pe = pe, sample_rel = sample_rel, params =params, path = path),
+      quiet = TRUE
+    )
+    cat(res, sep = '\n')
+    cat("\n")
+  }
+}
+
+
+

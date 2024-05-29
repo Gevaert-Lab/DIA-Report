@@ -15,27 +15,27 @@ app <- as.data.frame(colData(pe)) %>% filter( Group %in% sample_rel)%>% dplyr::s
 
 data <-  assay(pe[["proteinRS"]])[selected,rownames(app)]
 
-heatmap(data)
+heatmap(data,Colv = NA,Rowv = NA)
 
 #d3heatmap::d3heatmap(data, scale = "row", colors = "Spectral" )
 
 
-#  pdf(file = file.path(path,paste0("Heatmap_DE_protein",".pdf")))
-# p = pheatmap::pheatmap(data,
-#                            cluster_rows = TRUE,
-#                            scale = 'row',
-#                           show_rownames = TRUE,
-#                          show_colnames = FALSE,
-#                           annotation_col = app,
-#                           cluster_cols = TRUE,
-#                           fontsize_row = 10,
-#                           fontsize_col = 11,
-#                           width = 20,
-#                           height = 20,
-#                           main = 'Heatmap')
-#  
-#  print(p)
-# dev.off()
+#  pdf(file = file.path(path,paste0("Heatmap_DE_proteins",".pdf")))
+#  p = pheatmap::pheatmap(data,
+#                             cluster_rows = FALSE,
+#                             scale = 'row',
+#                            show_rownames = TRUE,
+#                           show_colnames = FALSE,
+#                            annotation_col = app,
+#                            cluster_cols = FALSE,
+#                            fontsize_row = 10,
+#                            fontsize_col = 11,
+#                            width = 20,
+#                            height = 20,
+#                            main = 'Heatmap DE proteins')
+#   
+# print(p)
+#  dev.off()
 
 
 ```

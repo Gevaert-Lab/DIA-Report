@@ -31,6 +31,9 @@ params:
   nNonZero: 3
   aggr_method: ""
   normalization: ""
+  folder_prj: ""
+  ensembl_annotation: ""
+  ensembl_col: ""
 ---
 
 <!-- <style> -->
@@ -86,6 +89,7 @@ library(hrbrthemes)
 library(ggVennDiagram)
 library(gridExtra)
 library(biomaRt)
+library(UpSetR)
 ```
 
 
@@ -96,84 +100,7 @@ library(biomaRt)
 
 
 ```{r functions}
- dfToWideMsqrob <- function(data, precursorquan) {
-   data %>%
-     filter(
-       PG.Q.Value <= 0.01 &
-         Q.Value <= 0.01 &
-         Precursor.Id != "" & 
-         .data[[precursorquan]] > 0
-     ) %>%
-     dplyr::select(
-       File.Name, 
-       Precursor.Id, 
-       Modified.Sequence, 
-       Stripped.Sequence, 
-       Protein.Group,
-       Protein.Ids, 
-       Protein.Names, 
-       Genes, 
-       Proteotypic,
-       First.Protein.Description,
-       .data[[precursorquan]]
-     ) %>%
-     tidyr::pivot_wider(
-       names_from = File.Name,
-       values_from = .data[[precursorquan]]
-     )
- }
-
-DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
-  #quantile_protein
-  #data_selector= 'batch_corrected'
-  cmp = label
-  all_res <-  rowData(data[["proteinRS"]])[[label]]
-  all_res <- all_res %>% rownames_to_column(var = 'Uniprot_id' )
-  temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names ) 
-  all_res <-  all_res %>% left_join( temp, by=join_by(Uniprot_id)) 
-  
-  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
-  all_res <- all_res[ ! is.na(all_res$adjPval),]
-  all_res$differential_expressed <- "NO"
-  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
-  all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
-  
-  p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
-                                          text = sprintf("Protein_name: %s <br> Gene_symbol: %s",   all_res$Protein.Names, all_res$Genes)   )  )  +
-    geom_point() +
-    theme_minimal() +
-    #geom_text_repel() +
-    geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
-    geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
-    scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
-    ggtitle(paste0("Volcano ",cmp) )
-  
-  DEall <- all_res[!is.na(all_res$adjPval) ,c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed")]
-  return ( list( toptable =DEall , volcano = p1) )
-}
-
- render_child <- function(data, path, pe, sample_rel,  template) {
-   if (missing(pe)  ){
-     # _templateContrast.Rmd _templateBArPlot.Rmd
-     res = knitr::knit_child(
-      text = xfun::read_utf8( template),
-      envir = rlang::env(data = data, path = path),
-      quiet = TRUE
-     )
-     cat(res, sep = '\n')
-    cat("\n")
-   }else{
-     # _templateHeatmap.Rmd
-      res = knitr::knit_child(
-      text = xfun::read_utf8( template),
-      envir = rlang::env(data = data, pe = pe, sample_rel = sample_rel, params =params, path = path),
-      quiet = TRUE
-     )
-     cat(res, sep = '\n')
-    cat("\n")
-    }
- }
-
+   source('utils_function.R')
 
 ```
 
@@ -187,17 +114,35 @@ if (all(params$comparisons == '') ){
   stop("Check parameter file: comparisons is not set" )
 }
 
-if ( ! params$aggr_method %in% c('robustSummary','medianPolish')) {
-  stop('normalization method not allowed.  Methods allowed are : [ robustSummary, medianPolish ]' )
+if ( ! params$aggr_method %in% c('robustSummary','medianPolish','colMeans','colMedians')) {
+  stop('normalization method not allowed.  Methods allowed are : [ robustSummary, medianPolish, colMeans ]' )
 }
+if (params$aggr_method  == 'medianPolish'){
+  aggr_method_f <- MsCoreUtils::medianPolish
+}
+if (params$aggr_method  == 'RobustSummary'){
+  aggr_method_f <- RobustSummary
+}
+if (params$aggr_method  == 'colMeans'){
+  aggr_method_f <- base::colMeans
+}
+if (params$aggr_method  == 'colMeadians'){
+  aggr_method_f <- matrixStats:::colMedians
+}
+
 if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", "quantiles","quantiles.robust","vsn") ){ 
    stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
   } 
   ## to do visualize input data 
-
-if (!dir.exists(file.path(".","Result"))){
-  dir.create('./Result')
+# 
+# if (!dir.exists(file.path(".","Result"))){
+#   dir.create('./Result')
+# }
+# make a subfolder for each contrast
+if (!dir.exists(file.path(".",params$folder_prj))){
+  dir.create(file.path(".", params$folder_prj, "Result"),recursive = TRUE)
 }
+ min_col_need_design <- c("sample","run", "group", "replicate")
 
 ```
 ## Import data 
@@ -211,19 +156,30 @@ All the precursors with *Q-value < 0.01* are used for the analysis.
   # 'peptidesRCB.txt'  
 
   data <- read.csv(params$input_file,sep='\t')
-  annotation <-  read.csv(params$design_file)
+  ## deal csv  with different separated values 
+  L <- readLines(params$design_file, n = 1)
+  if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-
- dfMsqrob <- dfToWideMsqrob( data, precursorquan = "Precursor.Translated")
-
+   
+  dfMsqrob <- dfToWideMsqrob( data, precursorquan = "Precursor.Translated")
  
+  result_check <- check_design_data(data,design) 
+  
+  if (result_check$status == 1 |  is.na(result_check$type_raw) ){
+    stop(result_check$error)
+  }  
+  
   samplenames <- tibble(
-   filename = names(dfMsqrob)[str_which(names(dfMsqrob), ".mzML")], 
-   samplename =  gsub('.mzML','',basename(filename) ) )
+   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
+   base_name_sample =  basename(filename) ) 
+  
+  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
  
- names(dfMsqrob)[str_which(names(dfMsqrob), ".mzML")] <- samplenames$samplename
+ names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)] <- samplenames$sample
  
-
+  diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
+  "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
+ 
 
 ```
 
@@ -233,14 +189,28 @@ All the precursors with *Q-value < 0.01* are used for the analysis.
 
  pe <- readQFeatures(table = dfMsqrob,
                      fnames = "Precursor.Id",
-                     ecol = str_starts(names(dfMsqrob), 'B'),
+                     ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
                      name = "precursor")
 
 
-colData(pe)$Group <- factor(annotation$group)
-colData(pe)$Replicate <- factor(annotation$replicate)
-colData(pe)$SampleName <- annotation$sample
+## really important arrange w.r.t to the samplesnames$sample to preserve the right order
 
+design <- design %>%  arrange(factor(sample, levels = samplenames$sample))
+
+colData(pe)$Group <- factor(design$group)
+colData(pe)$SampleName <- design$sample
+
+
+colData(pe)$Replicate <- factor(design$replicate)
+
+
+custom_col <- setdiff(colnames(design),min_col_need_design )
+
+if (length(custom_col) >= 1){
+    for (col_add in custom_col){
+      colData(pe)$col_add <-  design$col_add
+    }
+}
 
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
   assay %>%
@@ -264,22 +234,22 @@ The pre- processing steps are:
 ```{r pre_processing}
 
 pe <- filterFeatures(pe, ~ nNonZero >= params$nNonZero)
-# nrow(pe[["precursor"]]) # 153207 precursors
-# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 19534 proteins
+
 
 # Proteotypic features
 
 if (params$Proteotypic){
   pe <- filterFeatures(pe, ~ Proteotypic == 1)
-# nrow(pe[["precursor"]]) # 145712
-# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 17105
+
 }
 
+## filtering out contaminats
+
+#pe <- filterFeatures(pe , ~contains(Protein.Ids, "Cont_"))
 
 # At least 2 peptides per protein across all groups
 pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
-# nrow(pe[["precursor"]]) # 139581
-# length(unique(rowData(pe[["precursor"]])$Protein.Ids)) # 12034
+
 
 
 
@@ -288,13 +258,35 @@ pe <- logTransform(pe, base = 2, i = "precursor",
 
 pe <- normalize(pe,  method = params$normalization, i = "precursorLog",
                 name = "precursorNorm")
-
+#MsCoreUtils::medianPolish()
 
 pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fcol = "Protein.Ids",
                         name = "proteinRS",
-                        fun = params$aggr_method,
+                        fun = aggr_method_f,
                         na.rm = TRUE)
+
+```
+
+```{r adding_ensembl_annotation}
+if ( ! params$ensembl_annotation == ''){
+  ## read it 
+  ensembl_db_table <- read.csv(params$ensembl_annotation)
+  ## make it simple 
+  
+  ensembl_db_table <- ensembl_db_table %>%  distinct(ensembl_gene_id , .keep_all=TRUE)  %>% 
+      dplyr::select( params$ensembl_col    ) %>% distinct( hgnc_symbol, .keep_all=TRUE)
+  app <- as.data.frame(rowData(pe[['proteinRS']]))  %>%  left_join( ensembl_db_table , join_by(Genes ==  hgnc_symbol)) 
+  
+  for (i in  1:(length( params$ensembl_col) -1) ){
+     ann_col <- params$ensembl_col[i]
+     
+     rowData(pe[['proteinRS']])[[ann_col]] <- app[[ann_col]]
+  }
+ 
+
+}
+
 ```
 
 ## Data Missing Analysis
@@ -350,42 +342,41 @@ limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summari
 ```{r pca_plot}
 
 # to do make in for loop for a set of variable
-plot_c<- 1
 
-pca_ <-
-  pe[["proteinRS"]] %>%
-  filterNA() %>%
-  assay() %>%
-  t() %>%
-  prcomp() %>%
-  fviz_pca_ind(habillage = colData(pe)$Group  , geom=c("point"), addEllipses=FALSE, repel = FALSE ,title = "PCA by Group")
-plot(pca_)
+var_topca <- c('Group','Replicate')
+ if (length(custom_col) >= 1){
+   
+   var_topca <- append(var_topca,custom_col)
+   
+ }
+ 
+for (v in var_topca) {
+  # if (  all(is.na(colData(pe)$v) ==TRUE)){
+  #     ## skip if some cofactor are all null
+  #      next
+  #   
+  # }
+  pca_ <-pe[["proteinRS"]] %>%
+        filterNA() %>%
+        assay() %>%
+        t() %>%
+        prcomp() %>%
+        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"), addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
+  plot(pca_)
 
-png(filename= file.path(".","Result",paste0("PCA_",plot_c ,".png")), width=10, height=8, res=200, units="in")
-plot(pca_)
-invisible(dev.off())
+  png(filename= file.path(".", params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
+  plot(pca_)
+  invisible(dev.off())
+  
+}
 
-plot_c <- plot_c + 1
-
-pca_ <-
-  pe[["proteinRS"]] %>%
-  filterNA() %>%
-  assay() %>%
-  t() %>%
-  prcomp() %>%
-  fviz_pca_ind(habillage = colData(pe)$Replicate, geom=c("point"), addEllipses=FALSE,  repel = TRUE ,title = "PCA by Replicate")
-plot(pca_)
-
-png(filename= file.path(".","Result",paste0("PCA_",plot_c ,".png")), width=10, height=8, res=200, units="in")
-plot(pca_)
-invisible(dev.off())
 
 
 ```
 
 ## DE Analysis 
 
-Using MSqRob2.
+Using MSqRob2 with the following formula `r params$formula` with ridge regression disabled
 
 ```{r build_model}
 
@@ -409,15 +400,22 @@ getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
 
 
+
 test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
+
+
 names(test) <- params$comparisons 
 
-# make a subfolder for each contrast
-if (!dir.exists(file.path(".","Result","Contrast"))){
-  dir.create(file.path(".","Result","Contrast"))
+
+
+
+
+
+if (!dir.exists(file.path(".",params$folder_prj, "Result","Contrast"))){
+  dir.create(file.path(".", params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
 for (a in params$comparisons){
-  dir.create(file.path(".","Result","Contrast",a))
+  dir.create(file.path(".",params$folder_prj,"Result","Contrast",a), recursive = TRUE)
 }
 
 
@@ -433,9 +431,10 @@ for (a in params$comparisons){
 ```{r QC_plot}
 #| results: asis
   for (cmp in names(test)) {
-    cat( '##', paste(cmp,' P-values distribution ',sep=' '), '\n\n')
+    cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
     
-    render_child(data = test[[cmp]], path=file.path(".","Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
+    render_child(data = test[[cmp]], path=file.path(".",params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
@@ -452,26 +451,31 @@ for (a in params$comparisons){
 #| results: asis
 
   for (cmp in names(test)) {
-    cat( '##', paste(cmp,' Volcano plot',sep=' '), '\n\n')
+    cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(cmp_label,sep=' '), '\n\n')
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
 
-    
-    render_child(data = test[[cmp]],path=file.path(".","Result","Contrast",cmp),  template='_templateContrast.Rmd') 
+    render_child(data = test[[cmp]],path=file.path(".", params$folder_prj, "Result","Contrast",cmp),  template='_templateContrast.Rmd') 
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
-    #print(filt_val)   
+    #print(filt_val) 
+    
+    if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] == 0 ){
+      cat(' Not Significant proteins to be visualized in in the  heatmap \n')
+    }else{
     render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
-                 path= file.path(".","Result","Contrast",cmp),
+                 path= file.path(".",  params$folder_prj, "Result","Contrast",cmp),
                  template='_templateHeatmap.Rmd')
+    }
     cat('\n\n')
-    cat('These bar plots summarizes the number of significantly upregulated/downregulated number of miRNAs based on
-different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) 
-and log2 fold-change thresholds (on the x-axis) used to define the significance levels. ')
+    cat('\n\n')
+    cat('\n\n')
+    cat('These bar plots summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
     render_child(data = test[[cmp]],
-                 path= file.path(".","Result","Contrast",cmp),
+                 path= file.path(".", params$folder_prj, "Result","Contrast",cmp),
                  template='_templateBarPlot.Rmd')
     cat('\n\n')
     
@@ -481,7 +485,40 @@ and log2 fold-change thresholds (on the x-axis) used to define the significance 
 ```
 :::
 
+## Summary of the DE proteins
 
+```{r upset plot}
+    listInput <- list()
+    df_summary = data.frame(matrix(NA, ncol=1, nrow=4)[-1])
+    for (cmp in names(test)){
+         cmp_label <- gsub(params$contrast,'',cmp )
+         total =  dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') )[1]
+         up  = dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP') )[1]
+         down  =   dim(test[[cmp]]$toptable %>% filter(differential_expressed =='DOWN') )[1]
+         df_summary[[cmp_label]]  <- c(total, up,down)
+        
+        listInput[[cmp_label]] <- test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') %>% pull(Protein.Names)
+      
+    }
+    rownames(df_summary) <- c('Total DE','Up DE','Down DE')
+    df_summary <- df_summary[,-1]
+    ## visual table summary
+    DT::datatable( df_summary  ,
+             extensions = c('FixedColumns', 'Scroller'),
+             options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
+                            scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
+             ),
+     )
+    print(listInput)
+    upset(fromList(listInput), order.by = "freq")
+    
+    
+pdf(file= paste0(file.path(".", params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
+
+upset(fromList(listInput), order.by = "freq",text.scale= 1)
+dev.off()
+    
+```
 
 ## Session Info
 ```{r session_info }

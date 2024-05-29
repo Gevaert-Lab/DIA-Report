@@ -6,7 +6,7 @@ input_file: 'data/report.tsv'
 design_file: 'data/annotation_DIA_dummy.csv'
 formula: '~ -1 + Group'
 contrast: 'Group'
-aggr_method: 'robustSummary' # medianPolish robustSummary() ; base::colMeans() matrixStats::colMedians() base::colSums()
+aggr_method: 'robustSummary' # medianPolish robustSummary() ; colMeans() colMedians() base::colSums()
 normalization: 'quantiles' # "sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", ⁠"quantiles⁠", ⁠"quantiles.robust⁠" or "vsn"
 # include only proteotypic peptides
 Proteotypic: TRUE
