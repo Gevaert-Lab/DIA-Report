@@ -1,5 +1,18 @@
 
 ######
+######
+# check_design_data
+# This function checks some main sanity controls for the data retrieved in DIA 
+# report and in experiment design file 
+#Remark : Model result are supposed to be in proteinRS layer.
+# 
+# @param data_: data frame containing the DIA-NN report data
+# @param design: data frame contianing experiment design data 
+#
+# @return status : int 0 / 1 error found  
+# @return type_raw: format file of the raw file detected ,
+# @error error: error message
+
 check_design_data  <- function  (data_ , design){
   
   status <- 0
@@ -50,6 +63,14 @@ check_design_data  <- function  (data_ , design){
 }
 
 ######
+# check_design_data
+# This function after some quality check makes and filtering of some columns 
+# It makes  wide version of the DIA-NN result using the precursorquant columns
+# @param data frame containing the DIA-NN report data
+# @param precursorquan: columns to use to pivot into a wide format 
+# 
+# @return status : A data frame of DIA-NN in a wide format 
+
 dfToWideMsqrob <- function(data, precursorquan) {
   data %>%
     filter(
@@ -78,6 +99,15 @@ dfToWideMsqrob <- function(data, precursorquan) {
 }
 
 ######
+# DEP_volcano
+# This function computes volcano plot and gives the toptable for each contrast.
+# Remark : Model result are supposed to be in proteinRS layer.
+# @param: label contrast name 
+# @param: data Qfeatures object
+# @param: imagesDir  folder where to save Volcano and toptable (as excel)
+# @param: params document parameters list
+#  @return toptable  toptable result as dataframe (with annotation added) 
+#  @return volcano  volcano ggplot object
 
 DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   #quantile_protein
@@ -85,8 +115,8 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   cmp = label
   all_res <-  rowData(data[["proteinRS"]])[[label]]
   all_res <- all_res %>% rownames_to_column(var = 'Uniprot_id' )
-  
-  if ( all( head(params$ensembl_col,-1) %in%  names(rowData(pe[['proteinRS']]))  )  ){
+  # previous condition -> more complex head(params$ensembl_col,-1) %in%  names(rowData(pe[['proteinRS']])))
+  if (   all( ! params$ensembl_annotation == '' ))  {
     temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names, head(params$ensembl_col,-1) ) 
     
   }else{
@@ -102,7 +132,7 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
   all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
   
-  if ( all( head(params$ensembl_col,-1) %in%  names(rowData(pe[['proteinRS']]))  )  ) {
+  if ( ! params$ensembl_annotation == '') {
     ## adding ensemble annotation
     p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
                                       text = sprintf("Protein_name: %s <br> Gene_symbol: %s  <br> Chromosome name: %s",   all_res$Protein.Names, all_res$Genes,all_res$chromosome_name)   )  )  +
@@ -119,7 +149,7 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
       }else{
 
     p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
-                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s",   all_res$Protein.Names, all_res$Genes)   )  )  +
+                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s", all_res$Protein.Names, all_res$Genes)   )  )  +
       geom_point() +
       theme_minimal() +
       #geom_text_repel() +
@@ -129,15 +159,20 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
       ggtitle(paste0("Volcano ",cmp) )
     
     DEall <- all_res[!is.na(all_res$adjPval) ,c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed")]
-    
-    
   }
   return ( list( toptable =DEall , volcano = p1) )
 }
 
 
 ####
-
+#render_child
+# This function allow to render other template.Rmd in the main quarto document
+# @param data
+# @param path
+# @param pe
+# @parma sample_rel
+# @param template 
+# @return none
 render_child <- function(data, path, pe, sample_rel,  template) {
   if (missing(pe)  ){
     # _templateContrast.Rmd _templateBArPlot.Rmd

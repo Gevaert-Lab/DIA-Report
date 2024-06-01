@@ -4,16 +4,20 @@ subtitle: "`r params$subtitle`"
 author: "`r params$author`"
 format: 
   html:
-    fig-width: 10
-    fig-height: 8
+    fig-width: 12
+    fig-height: 10
     toc: true
+    toc-title: 'DE Analysis'
     css: style.css
+title-block-banner: "#42b6ba"
+
 execute: 
   echo: false
   warning: false
 embed-resources: true
-theme: "cosmo"
-title-block-banner: "#5a2a82 "
+theme: 
+ - cosmo
+ - custom.scss
 params:
   description: ""
   title: ""
@@ -31,6 +35,8 @@ params:
   nNonZero: 3
   aggr_method: ""
   normalization: ""
+  filtering_contaminats: ""
+  contaminats_str: ""
   folder_prj: ""
   ensembl_annotation: ""
   ensembl_col: ""
@@ -88,7 +94,6 @@ library(visdat)
 library(hrbrthemes)
 library(ggVennDiagram)
 library(gridExtra)
-library(biomaRt)
 library(UpSetR)
 ```
 
@@ -132,10 +137,14 @@ if (params$aggr_method  == 'colMeadians'){
 
 if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", "quantiles","quantiles.robust","vsn") ){ 
    stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
-  } 
-  ## to do visualize input data 
-# 
-# if (!dir.exists(file.path(".","Result"))){
+}
+
+if (params$filtering_contaminats){
+   if (params$contaminats_str == ""){
+     stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminats,..)")
+   } 
+}
+  ## to do visualize input contaminats_str(".","Result"))){
 #   dir.create('./Result')
 # }
 # make a subfolder for each contrast
@@ -225,11 +234,12 @@ rowData(pe[["precursor"]])$pep_per_prot <-
 
 ```
 
-The pre- processing steps are:
+The pre-processing steps are:
 
  - Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples 
  - `r if (params$Proteotypic) 'Select only proteotypic peptides' else 'Select both not and proteotypic peptides'`
  - Select proteins with at least **`r params$pep_per_prot` peptides**
+ - `r if (params$filtering_contaminats) 'Contaminats proteins are filtered ' else 'Contaminats proteins are not filtered'`
 
 ```{r pre_processing}
 
@@ -245,7 +255,10 @@ if (params$Proteotypic){
 
 ## filtering out contaminats
 
-#pe <- filterFeatures(pe , ~contains(Protein.Ids, "Cont_"))
+if (params$filtering_contaminats){
+  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
+
+}
 
 # At least 2 peptides per protein across all groups
 pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
@@ -487,6 +500,8 @@ for (a in params$comparisons){
 
 ## Summary of the DE proteins
 
+In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the  comparisons is also showed using an upset plot.
+
 ```{r upset plot}
     listInput <- list()
     df_summary = data.frame(matrix(NA, ncol=1, nrow=4)[-1])
@@ -509,14 +524,14 @@ for (a in params$comparisons){
                             scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
              ),
      )
-    print(listInput)
-    upset(fromList(listInput), order.by = "freq")
+    #print(listInput)
+    upset(fromList(listInput), order.by = "freq",nsets = 7)
     
     
 pdf(file= paste0(file.path(".", params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
 
-upset(fromList(listInput), order.by = "freq",text.scale= 1)
-dev.off()
+upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
+invisible(dev.off())
     
 ```
 
