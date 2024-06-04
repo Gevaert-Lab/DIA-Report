@@ -5,13 +5,15 @@ library(plotly)
 ggplotly(data$volcano)
 
 
-png(filename= file.path(path,paste0("Volcano",".png")), width=10, height=8, res=200, units="in")
+#pdf(file= file.path(path,paste0("Volcano",".pdf")), width=10, height=10, res=200, units="in")
 
-data$volcano
+pdf(file= file.path(path,paste0("Volcano",".pdf")), paper='A4')
+
+data$volcano2file
 
 invisible(dev.off())
 
-cat('Differential Expressed Proteins \n')
+#cat('Differential Expressed Proteins \n')
 library(DT)
 DT::datatable( data$toptable %>% arrange(adjPval)  ,
              extensions = c('FixedColumns', 'Scroller'),

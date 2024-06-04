@@ -72,14 +72,24 @@ params:
 <!-- </div> -->
 
 
+
+
 ```{r input}
  #| output: false
+source('utils_function.R')
 
+required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel",
+                    "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
+                    "factoextra","hrbrthemes","gridExtra","UpSetR","heatmaply")
+#print(required_packages)
+#check_dependencies(required_packages)
+# 
 library(QFeatures)
 library(msqrob2)
 library(readxl)
 library(SummarizedExperiment)
 library(visdat)
+library(ggrepel)
 library(dplyr)
 library(tidyverse)
 library(magrittr)
@@ -90,11 +100,11 @@ library(DT)
 library(tibble)
 library(MSnbase)
 library(factoextra)
-library(visdat)
 library(hrbrthemes)
-library(ggVennDiagram)
 library(gridExtra)
 library(UpSetR)
+library(heatmaply)
+# #webshot::install_phantomjs()
 ```
 
 
@@ -103,11 +113,6 @@ library(UpSetR)
 `r params$description`
 
 
-
-```{r functions}
-   source('utils_function.R')
-
-```
 
 ```{r check_parameter}
 
@@ -192,7 +197,7 @@ All the precursors with *Q-value < 0.01* are used for the analysis.
 
 ```
 
-## Creating Q-Features object and run pre processing
+##  Filtering steps
 
 ```{r preparation }
 
@@ -304,7 +309,7 @@ if ( ! params$ensembl_annotation == ''){
 
 ## Data Missing Analysis
 
-The plot shows the completness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins  are  ordered based on the increasing NA content. 
+The plot shows the completeness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins  are  ordered based on the increasing NA content. 
 
 ```{r missing_val_analysis}
 peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
@@ -325,7 +330,7 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
         legend.position=c(.35,.15)
   ) +   ggtitle("Missingness - protein level")
 
-missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
+#missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
 #print(missingness)
 
 ```
@@ -374,7 +379,7 @@ for (v in var_topca) {
         assay() %>%
         t() %>%
         prcomp() %>%
-        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"), addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
+        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"),  pointsize = 3, addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
   plot(pca_)
 
   png(filename= file.path(".", params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
@@ -526,7 +531,6 @@ In the table you can find a summaries of the number of DE proteins found in all 
      )
     #print(listInput)
     upset(fromList(listInput), order.by = "freq",nsets = 7)
-    
     
 pdf(file= paste0(file.path(".", params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
 
