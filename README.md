@@ -40,3 +40,24 @@ The description of the paramaters is the following:
 - `ensembl_col`: list of the annotation fields that are added. last columns must be a gene symbol
 - `filtering_contaminats`: activate / deactivate the filtering of the contaminats
 - `contaminats_str`: string used to find the contaminats (e.g: Cont)
+
+## Experiment Design File
+
+The experiment design is a  csv file , that must include the following columns:
+
+- `sample` : Sample name. This will be used in all the plots , so it is important that is also meaninfull and not too long
+- `run` : This is file name of the raw file (included the file format mzML/.d/.raw) processed and also included in DIA-NN report.
+- `group` : Different groups present in the experiment (Cancer/control, mutation/WT)
+- `replicate`: a label that indicated the replicates of the samples.
+
+A small example is the following:
+
+| sample | run | group | replicate |
+| -------- | ------- |------- |------- |
+| B000250_ratio01_DIA | B000250_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio01_DIA.mzML | A |1 |
+| B000254_ratio02_DIA | B000254_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio02_DIA.mzML | B | 1 |
+| B000258_ratio04_DIA | B000258_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio04_DIA.mzML | C | 1 |
+| B000262_ratio08_DIA | B000262_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio08_DIA.mzMLL | D |1 |
+| B000266_ratio10_DIA| B000266_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio10_DIA.mzML | E | 1 |
+
+Remark : It is really important that the run name is also included in the DIA-NN report.
