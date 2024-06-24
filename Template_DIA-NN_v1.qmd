@@ -33,8 +33,8 @@ params:
   Proteotypic: TRUE
   pep_per_prot: 3
   nNonZero: 3
-  aggr_method: ""
-  normalization: ""
+  aggr_method: "medianPolish"
+  normalization: "quantiles"
   filtering_contaminats: ""
   contaminats_str: ""
   folder_prj: ""
@@ -78,32 +78,31 @@ params:
  #| output: false
 source('utils_function.R')
 
-required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel",
-                    "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR","heatmaply")
+required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger')
 #print(required_packages)
-#check_dependencies(required_packages)
+check_dependencies(required_packages)
 # 
-library(QFeatures)
-library(msqrob2)
-library(readxl)
-library(SummarizedExperiment)
-library(visdat)
-library(ggrepel)
-library(dplyr)
-library(tidyverse)
-library(magrittr)
-library(here)
-library(tidyr)
-library(plotly)
-library(DT)
-library(tibble)
-library(MSnbase)
-library(factoextra)
-library(hrbrthemes)
-library(gridExtra)
-library(UpSetR)
-library(heatmaply)
+# library(QFeatures)
+# library(msqrob2)
+# library(readxl)
+# library(SummarizedExperiment)
+# library(visdat)
+# library(ggrepel)
+# library(dplyr)
+# library(tidyverse)
+# library(magrittr)
+# library(here)
+# library(tidyr)
+# library(plotly)
+# library(DT)
+# library(tibble)
+# library(MSnbase)
+# library(factoextra)
+# library(hrbrthemes)
+# library(gridExtra)
+# library(UpSetR)
+#library(heatmaply)
 # #webshot::install_phantomjs()
 ```
 
@@ -182,7 +181,6 @@ All the precursors with *Q-value < 0.01* are used for the analysis.
   if (result_check$status == 1 |  is.na(result_check$type_raw) ){
     stop(result_check$error)
   }  
-  
   samplenames <- tibble(
    filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
    base_name_sample =  basename(filename) ) 
@@ -219,6 +217,9 @@ colData(pe)$Replicate <- factor(design$replicate)
 
 
 custom_col <- setdiff(colnames(design),min_col_need_design )
+
+#log_formatter(formatter_pander)
+#log_info(pe)
 
 if (length(custom_col) >= 1){
     for (col_add in custom_col){
@@ -423,8 +424,6 @@ test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 
 
 names(test) <- params$comparisons 
-
-
 
 
 

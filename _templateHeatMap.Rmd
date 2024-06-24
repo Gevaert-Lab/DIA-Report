@@ -5,6 +5,13 @@ library(pheatmap)
 library(dplyr)
 library(heatmaply)
 
+source('utils_function.R')
+
+required_packages = c("dplyr","heatmaply")
+#print(required_packages)
+check_dependencies(required_packages)
+
+
 #selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))%>% rownames_to_column(var = "rowname") %>% pull(rowname) 
 
 selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))  %>% pull(Uniprot_id)

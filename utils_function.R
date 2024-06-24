@@ -1,6 +1,6 @@
 
 
-######-----------------------------------------------------------
+######------check_design_data-----------------------------------------------------
 #' @author Andrea Argentini
 #' check_design_data
 #' This function checks some main sanity controls for the data retrieved in DIA 
@@ -63,7 +63,7 @@ check_design_data  <- function  (data_ , design){
   
 }
 
-######------------------------------
+######-----dfToWideMsqrob-------------------------
 #' @author Leander 
 #' dfToWideMsqrob
 #' This function after some quality check makes and filtering of some columns 
@@ -100,7 +100,7 @@ dfToWideMsqrob <- function(data, precursorquan) {
     )
 }
 
-######-------------------------------
+######--- DEP_volcano----------------------------
 #' @author Andrea Argentini 
 #' DEP_volcano
 #' This function computes volcano plot and gives the toptable for each contrast.
@@ -182,7 +182,7 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
 }
 
 
-####
+####----render_child-----
 #' render_child
 #' This function allow to render other template.Rmd in the main quarto document
 #' @param data
@@ -213,7 +213,7 @@ render_child <- function(data, path, pe, sample_rel,  template) {
   }
 }
 
-### check packages dependencies ------------------------------------------------
+### check packages dependencies --------------------------
 #'
 #' @author Andrea Argentini 
 #'
