@@ -1,8 +1,10 @@
 # DIA-Report
 
-Welcome to DIA-Report! Your new best buddy for DE report on DIA proteomics data.  
-With DIA-Report you can create advanced differential protein expressed analysis report based on **DIA-NN result**, in just one command.
-The statistical analysis is based on MSQrob2 and Qfeatures packages that allow to filter your data with various parameters  and perform differential expression on proteomics data. The high number of parameters allows you to customized the analysis on your needs (normalization methods, missing value filtering, aggregation methods) and not rely in just black-box statistical analysis.
+Welcome to DIA-Report! Your best buddy for DE report on DIA proteomics data.  
+
+With DIA-Report you can generate advanced differential expression analysis report based on **DIA-NN result**, in just one command.
+
+The statistical analysis is based on MSQrob2 and Qfeatures packages that allow to filter your data with various parameters and perform differential expression on proteomics data. The high number of parameters allows you to customized the analysis on your needs (normalization methods, missing value filtering, aggregation methods) and not rely in just black-box statistical analysis.
 
 ## Requirements
 
@@ -21,8 +23,8 @@ The description of the paramaters is the following:
 
 - `title`: title of the report
 - `subtitle`: subtitle
-- `author`: author nalme
-- `description` :description of the experiments
+- `author`: author name
+- `description` : description of the experiments
 - `input_file`: path of the DIA-NN report file
 - `design_file`: path of the experiment design file
 - `folder_prj`: path of the root output folder of the analysis
