@@ -43,36 +43,58 @@ params:
 ---
 
 <!-- <style> -->
+
 <!-- #logo -->
+
 <!-- { -->
+
 <!--     position: relative; -->
+
 <!-- } -->
+
 <!-- #logo img { -->
+
 <!--     /*position: relative;*/ -->
+
 <!--     top: 25px; -->
+
 <!--     /*right: 0px;*/ -->
+
 <!--     left: 50px; -->
+
 <!--     position: fixed; -->
+
 <!--     width: 125px; -->
+
 <!--     } -->
+
 <!-- #header .btn-group { -->
+
 <!--     display: none; -->
+
 <!-- } -->
+
 <!-- body -->
+
 <!-- { -->
+
 <!--     position: absolute; -->
+
 <!--     top: 150px; -->
+
 <!-- } -->
+
 <!-- </style> -->
 
 <!-- <div id="logo" align="top"> -->
+
 <!-- ```{r echo = FALSE} -->
+
 <!-- knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg') -->
+
 <!-- ``` -->
+
 <!-- </div> -->
-
-
-
 
 ```{r input}
  #| output: false
@@ -106,12 +128,9 @@ check_dependencies(required_packages)
 # #webshot::install_phantomjs()
 ```
 
-
-## Experiment 
+## Experiment
 
 `r params$description`
-
-
 
 ```{r check_parameter}
 
@@ -152,18 +171,19 @@ if (params$filtering_contaminats){
 #   dir.create('./Result')
 # }
 # make a subfolder for each contrast
-if (!dir.exists(file.path(".",params$folder_prj))){
-  dir.create(file.path(".", params$folder_prj, "Result"),recursive = TRUE)
+if (!dir.exists(file.path(params$folder_prj))){
+  dir.create(file.path( params$folder_prj),recursive = TRUE)
 }
+ dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
  min_col_need_design <- c("sample","run", "group", "replicate")
 
 ```
-## Import data 
+
+## Import data
 
 Reading DIA data from **`r params$input_file`** using *Precursor.Translated* intensities from DIA-NN.
 
-All the precursors with *Q-value < 0.01* are used for the analysis.
-
+All the precursors with *Q-value \< 0.01* are used for the analysis.
 
 ```{r import data}
   # 'peptidesRCB.txt'  
@@ -195,11 +215,11 @@ All the precursors with *Q-value < 0.01* are used for the analysis.
 
 ```
 
-##  Filtering steps
+## Filtering steps
 
 ```{r preparation }
 
- pe <- readQFeatures(table = dfMsqrob,
+ pe <- readQFeatures( dfMsqrob,
                      fnames = "Precursor.Id",
                      ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
                      name = "precursor")
@@ -242,14 +262,19 @@ rowData(pe[["precursor"]])$pep_per_prot <-
 
 The pre-processing steps are:
 
- - Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples 
- - `r if (params$Proteotypic) 'Select only proteotypic peptides' else 'Select both not and proteotypic peptides'`
- - Select proteins with at least **`r params$pep_per_prot` peptides**
- - `r if (params$filtering_contaminats) 'Contaminats proteins are filtered ' else 'Contaminats proteins are not filtered'`
+-   Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples
+-   `r if (params$Proteotypic) 'Select only proteotypic peptides' else 'Select both not and proteotypic peptides'`
+-   Select proteins with at least **`r params$pep_per_prot` peptides**
+-   `r if (params$filtering_contaminats) 'Contaminats proteins are filtered ' else 'Contaminats proteins are not filtered'`
 
 ```{r pre_processing}
 
-pe <- filterFeatures(pe, ~ nNonZero >= params$nNonZero)
+
+size <- dim(colData(pe))[1]
+
+## filtering per group
+
+ pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
 
 
 # Proteotypic features
@@ -310,7 +335,7 @@ if ( ! params$ensembl_annotation == ''){
 
 ## Data Missing Analysis
 
-The plot shows the completeness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins  are  ordered based on the increasing NA content. 
+The plot shows the completeness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins are ordered based on the increasing NA content.
 
 ```{r missing_val_analysis}
 peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
@@ -336,14 +361,13 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 
 ```
 
-## Normalization 
+## Normalization
 
 Raw intensities from DIA-NN are processed as follow:
 
- - Log 2 transformation 
- - Normalized across all the samples using **`r params$normalization`** method
- - Summarization at protein level using **`r params$aggr_method`** function
-
+-   Log 2 transformation
+-   Normalized across all the samples using **`r params$normalization`** method
+-   Summarization at protein level using **`r params$aggr_method`** function
 
 ```{r normalization_plot}
 par(mfrow=c(1,3))
@@ -354,14 +378,12 @@ limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summari
 
 ```
 
-
-## PCA 
-
+## PCA
 
 ```{r pca_plot}
 
 # to do make in for loop for a set of variable
-
+log_info(params$folder_prj)
 var_topca <- c('Group','Replicate')
  if (length(custom_col) >= 1){
    
@@ -383,7 +405,7 @@ for (v in var_topca) {
         fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"),  pointsize = 3, addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
   plot(pca_)
 
-  png(filename= file.path(".", params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
+  png(filename= file.path( params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
   plot(pca_)
   invisible(dev.off())
   
@@ -393,7 +415,7 @@ for (v in var_topca) {
 
 ```
 
-## DE Analysis 
+## DE Analysis
 
 Using MSqRob2 with the following formula `r params$formula` with ridge regression disabled
 
@@ -428,42 +450,37 @@ names(test) <- params$comparisons
 
 
 
-if (!dir.exists(file.path(".",params$folder_prj, "Result","Contrast"))){
-  dir.create(file.path(".", params$folder_prj, "Result","Contrast"), recursive = TRUE)
+if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
+  dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
 for (a in params$comparisons){
-  dir.create(file.path(".",params$folder_prj,"Result","Contrast",a), recursive = TRUE)
+  dir.create(file.path(params$folder_prj,"Result","Contrast",a), recursive = TRUE)
 }
 
 
 
 ```
 
-
-
 ## QC plots
 
-::: {.panel-tabset}
-
+::: panel-tabset
 ```{r QC_plot}
 #| results: asis
   for (cmp in names(test)) {
     cmp_label <- gsub(params$contrast,'',cmp )
     cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
     
-    render_child(data = test[[cmp]], path=file.path(".",params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
+    render_child(data = test[[cmp]], path=file.path(params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
 
 ```
-
 :::
 
-## Group Comparison   
+## Group Comparison
 
-::: {.panel-tabset}
-
+::: panel-tabset
 ```{r comparison}
 #| results: asis
 
@@ -473,7 +490,7 @@ for (a in params$comparisons){
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
 
-    render_child(data = test[[cmp]],path=file.path(".", params$folder_prj, "Result","Contrast",cmp),  template='_templateContrast.Rmd') 
+    render_child(data = test[[cmp]],path=file.path( params$folder_prj, "Result","Contrast",cmp),  template='_templateContrast.Rmd') 
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
@@ -484,7 +501,7 @@ for (a in params$comparisons){
     }else{
     render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
-                 path= file.path(".",  params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path(  params$folder_prj, "Result","Contrast",cmp),
                  template='_templateHeatmap.Rmd')
     }
     cat('\n\n')
@@ -492,7 +509,7 @@ for (a in params$comparisons){
     cat('\n\n')
     cat('These bar plots summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
     render_child(data = test[[cmp]],
-                 path= file.path(".", params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path( params$folder_prj, "Result","Contrast",cmp),
                  template='_templateBarPlot.Rmd')
     cat('\n\n')
     
@@ -504,7 +521,7 @@ for (a in params$comparisons){
 
 ## Summary of the DE proteins
 
-In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the  comparisons is also showed using an upset plot.
+In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
 
 ```{r upset plot}
     listInput <- list()
@@ -531,7 +548,7 @@ In the table you can find a summaries of the number of DE proteins found in all 
     #print(listInput)
     upset(fromList(listInput), order.by = "freq",nsets = 7)
     
-pdf(file= paste0(file.path(".", params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
+pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
 
 upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
 invisible(dev.off())
@@ -539,7 +556,7 @@ invisible(dev.off())
 ```
 
 ## Session Info
+
 ```{r session_info }
 sessionInfo()
 ```
-
