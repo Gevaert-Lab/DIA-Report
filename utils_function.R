@@ -8,7 +8,7 @@
 #'Remark : Model result are supposed to be in proteinRS layer.
 #' 
 #' @param data_: data frame containing the DIA-NN report data
-#' @param design: data frame contianing experiment design data 
+#' @param design: data frame containing experiment design data 
 #'
 #' @return status : int 0 / 1 error found  
 #' @return type_raw: format file of the raw file detected ,
