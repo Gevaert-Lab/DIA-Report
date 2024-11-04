@@ -101,7 +101,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales')
 #print(required_packages)
 check_dependencies(required_packages)
 # 
@@ -175,7 +175,7 @@ if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
- min_col_need_design <- c("sample","run", "group", "replicate")
+ min_col_need_design <- c("sample","run", "group", "replicate","filename")
 
 ```
 
@@ -201,13 +201,27 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   if (result_check$status == 1 |  is.na(result_check$type_raw) ){
     stop(result_check$error)
   }  
-  samplenames <- tibble(
+  
+  if ( .Platform$OS.type == "unix" ){
+    samplenames <- tibble(
+   filename = gsub('\\\\','/' ,names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)]), 
+   base_name_sample =  basename(filename) ) 
+  
+  }else{
+    samplenames <- tibble(
    filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
+   base_name_sample =  basename(filename) ) 
+    
+  }
+  
+  samplenames <- tibble(
+   filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
    base_name_sample =  basename(filename) ) 
   
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
  
- names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)] <- samplenames$sample
+ 
+  names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))] <- samplenames$sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
@@ -218,7 +232,7 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
 ## Filtering steps
 
 ```{r preparation }
-
+#log_info('{colnames(dfMsqrob)}')
  pe <- readQFeatures( dfMsqrob,
                      fnames = "Precursor.Id",
                      ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
@@ -375,7 +389,7 @@ limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transfor
 limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
 limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization' )
 
-
+saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
 ```
 
 ## PCA
@@ -385,30 +399,36 @@ limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summari
 # to do make in for loop for a set of variable
 log_info(params$folder_prj)
 var_topca <- c('Group','Replicate')
+#var_topca <- c('Group')
  if (length(custom_col) >= 1){
    
-   var_topca <- append(var_topca,custom_col)
+ var_topca <- append(var_topca,custom_col)
    
  }
- 
+
 for (v in var_topca) {
   # if (  all(is.na(colData(pe)$v) ==TRUE)){
   #     ## skip if some cofactor are all null
   #      next
   #   
   # }
-  pca_ <-pe[["proteinRS"]] %>%
+  
+  prcompPe<-pe[["proteinRS"]] %>%
         filterNA() %>%
         assay() %>%
         t() %>%
-        prcomp() %>%
-        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"),  pointsize = 3, addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
-  plot(pca_)
-
-  png(filename= file.path( params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
-  plot(pca_)
-  invisible(dev.off())
+        prcomp()
   
+  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ",v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[v]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
+		
+#        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"),  pointsize = 3, addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
+ 
+   plot(pca_)
+
+  # png(filename= file.path( params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
+  # plot(pca_)
+  # invisible(dev.off())
+
 }
 
 
