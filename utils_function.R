@@ -237,3 +237,30 @@ check_dependencies = function(required_packages = required_packages){
   
 }
 
+######------checkGroups-----------------------------------------------------
+#' @author Caterina Lizzio
+#' checkGroups
+#' This function checks if groups in input are the same as groups in metadata file
+#' 
+#' @param inputParams: comparisons groups in input parameter list 
+#' @param dfDesign: data frame containing experiment design data 
+#'
+#' @return status : int 0 / 1 error found  
+#' @error error: error message
+
+
+checkGroups<- function (inputParams, dfDesign){
+  goupsComparisons <- str_remove(unique(unlist(strsplit(inputParams,' - ',fixed=T))), "Group")
+  
+  if(!all( goupsComparisons %in% unique(dfDesign$group))== TRUE) {
+    error <-  capture.output( cat ( 'Groups in comparison do not match groups in design file' ) )
+    status <- 1
+    return( list(status=status,error=error))
+  } else {
+    status <- 0
+    return( list(status=status,error=""))
+    
+  }
+  
+}
+

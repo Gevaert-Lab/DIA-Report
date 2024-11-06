@@ -101,7 +101,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander')
 #print(required_packages)
 check_dependencies(required_packages)
 # 
@@ -133,6 +133,12 @@ check_dependencies(required_packages)
 `r params$description`
 
 ```{r check_parameter}
+
+formatter_data_frame <- function(df, ...) {
+     pander::pander_return(df, style = 'simple')
+}
+log_formatter(formatter_data_frame)
+log_formatter(formatter_glue)
 
 if (params$contrast == '' ){
   stop("Check parameter file: contrast is not set" )
@@ -200,6 +206,11 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   
   if (result_check$status == 1 |  is.na(result_check$type_raw) ){
     stop(result_check$error)
+  }  
+  
+  check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
+if (check_groups$status == 1){
+    stop(check_groups$error)
   }  
   
   if ( .Platform$OS.type == "unix" ){
@@ -551,13 +562,17 @@ In the table you can find a summaries of the number of DE proteins found in all 
          total =  dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') )[1]
          up  = dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP') )[1]
          down  =   dim(test[[cmp]]$toptable %>% filter(differential_expressed =='DOWN') )[1]
+         log_info(cmp)
+         log_info(total)
          df_summary[[cmp_label]]  <- c(total, up,down)
         
         listInput[[cmp_label]] <- test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') %>% pull(Protein.Names)
       
     }
     rownames(df_summary) <- c('Total DE','Up DE','Down DE')
+    #log_info(listInput[[cmp_label]])
     df_summary <- df_summary[,-1]
+    #log_info(df_summary)
     ## visual table summary
     DT::datatable( df_summary  ,
              extensions = c('FixedColumns', 'Scroller'),
@@ -565,13 +580,13 @@ In the table you can find a summaries of the number of DE proteins found in all 
                             scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
              ),
      )
-    #print(listInput)
-    upset(fromList(listInput), order.by = "freq",nsets = 7)
-    
-pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
-
-upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
-invisible(dev.off())
+    print(listInput)
+    #upset(fromList(listInput), order.by = "freq")
+     
+# pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
+# 
+# upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
+# invisible(dev.off())
     
 ```
 
