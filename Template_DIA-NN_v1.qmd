@@ -197,7 +197,7 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   data <- read.csv(params$input_file,sep='\t')
   ## deal csv  with different separated values 
   L <- readLines(params$design_file, n = 1)
-  if (grepl(";", L)) design <- read.csv2(params$design_file, row.names = 1) else design <- read.csv(params$design_file, row.names = 1)
+  if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
    
   dfMsqrob <- dfToWideMsqrob( data, precursorquan = "Precursor.Translated")
@@ -622,9 +622,9 @@ In the table you can find a summaries of the number of DE proteins found in all 
      
       pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
        
-      upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
+     upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
       invisible(dev.off())
-
+ 
 }
     #print(listInput)
     #upset(fromList(listInput), order.by = "freq")
