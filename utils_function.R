@@ -264,3 +264,27 @@ checkGroups<- function (inputParams, dfDesign){
   
 }
 
+######------checkCofounderList-----------------------------------------------------
+#' @author Caterina Lizzio
+#' checkCofounderList
+#' This function checks if cofounder values in input are present in design file
+#' 
+#' @param cofounderList: cofounder values in input parameter list 
+#' @param colsDesign: colnames in design data 
+#'
+#' @return status : int 0 / 1 error found  
+#' @error error: error message
+checkCofounderList<- function (cofounderList, colsDesign) {
+
+  if (! all (cofounderList %in%  colsDesign))  { 
+    error <-  capture.output( cat ( 'cofounder values are not present in design file' ) )
+    status <- 1
+    return( list(status=status,error=error))
+  } else {
+    status <- 0
+    return( list(status=status,error=""))
+    
+  }
+
+}
+

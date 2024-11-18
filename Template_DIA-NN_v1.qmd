@@ -40,6 +40,7 @@ params:
   folder_prj: ""
   ensembl_annotation: ""
   ensembl_col: ""
+  cofounder_list: ""
 ---
 
 <!-- <style> -->
@@ -183,6 +184,7 @@ if (!dir.exists(file.path(params$folder_prj))){
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
  min_col_need_design <- c("sample","run", "group", "replicate","filename")
 
+
 ```
 
 ## Import data
@@ -211,7 +213,14 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
 if (check_groups$status == 1){
     stop(check_groups$error)
-  }  
+}  
+
+  check_cofounder_list<-checkCofounderList(cofounderList= params$cofounder_list, colsDesign=colnames(design))
+if (check_cofounder_list$status == 1){
+    stop(check_cofounder_list$error)
+}
+#log_info(params$cofounder_list[1]) 
+  
   
   if ( .Platform$OS.type == "unix" ){
     samplenames <- tibble(
@@ -269,7 +278,12 @@ custom_col <- setdiff(colnames(design),min_col_need_design )
 if (length(custom_col) >= 1){
     for (col_add in custom_col){
       colData(pe)[[col_add]] <-  design[[col_add]]
-    }
+       
+      if  (is.character(design[[col_add]])) {
+          design[[col_add]]<- as.factor(design[[col_add]])
+  	   }
+      
+      }
 }
 #log_info('{ dim(colData(pe)[2] }')
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
@@ -364,27 +378,30 @@ if ( ! params$ensembl_annotation == ''){
 cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
-for  (col in custom_col){
-   if  (is.character(cData[[col]])) {
-     log_info(paste0('Character - ', col))
-     list_character <- append(list_character, col)
-      
-   }else {
-     log_info(paste0('Numeric - ', col))
-     list_numeric <- append(list_numeric, col)
-   }  
+
+if (all(params$cofounder_list != '')) {
+  for  (col in params$cofounder_list){
+     if  (is.character(cData[[col]])) {
+       log_info(paste0('Character - ', col))
+       list_character <- append(list_character, col)
+        
+     }else {
+       log_info(paste0('Numeric - ', col))
+       list_numeric <- append(list_numeric, col)
+     }  
+  }
+  
+  cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
+  
+  ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  
+  for (col_ch in unlist(list_character)){
+    log_info(col_ch)
+    boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    print(boxplot_ch)
+  }
+
 }
-
-cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
-
-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
-
-for (col_ch in unlist(list_character)){
-  log_info(col_ch)
-  boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
-  print(boxplot_ch)
-}
-
 
 
 ```
