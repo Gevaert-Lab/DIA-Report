@@ -41,6 +41,7 @@ params:
   ensembl_annotation: ""
   ensembl_col: ""
   cofounder_list: ""
+  PCA_comparison: "Group"
 ---
 
 <!-- <style> -->
@@ -215,12 +216,12 @@ if (check_groups$status == 1){
     stop(check_groups$error)
 }  
 
-  check_cofounder_list<-checkCofounderList(cofounderList= params$cofounder_list, colsDesign=colnames(design))
+  check_cofounder_list<-checkCofounder(cofounder= params$cofounder_list, colsDesign=colnames(design))
 if (check_cofounder_list$status == 1){
     stop(check_cofounder_list$error)
 }
 #log_info(params$cofounder_list[1]) 
-  
+
   
   if ( .Platform$OS.type == "unix" ){
     samplenames <- tibble(
@@ -266,6 +267,7 @@ design <- design %>%  arrange(factor(sample, levels = samplenames$sample))
 colData(pe)$Group <- factor(design$group)
 colData(pe)$SampleName <- design$sample
 
+#group column from design is now Group in coData(pe)
 
 colData(pe)$Replicate <- factor(design$replicate)
 
@@ -285,6 +287,13 @@ if (length(custom_col) >= 1){
       
       }
 }
+
+  check_cofounder_PCA<-checkCofounder(cofounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
+if (check_cofounder_PCA$status == 1){
+    stop(check_cofounder_PCA$error)
+}
+
+
 #log_info('{ dim(colData(pe)[2] }')
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
   assay %>%
@@ -393,8 +402,8 @@ if (all(params$cofounder_list != '')) {
   
   cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
   
-  ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
-  
+  boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  print(boxplot_num)
   for (col_ch in unlist(list_character)){
     log_info(col_ch)
     boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
@@ -458,40 +467,54 @@ saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe
 
 # to do make in for loop for a set of variable
 log_info(params$folder_prj)
-var_topca <- c('Group','Replicate')
-#var_topca <- c('Group')
- if (length(custom_col) >= 1){
-   
- var_topca <- append(var_topca,custom_col)
-   
- }
+var_topca <- params$PCA_comparison
 
-for (v in var_topca) {
-  # if (  all(is.na(colData(pe)$v) ==TRUE)){
-  #     ## skip if some cofactor are all null
-  #      next
-  #   
-  # }
-  
-  prcompPe<-pe[["proteinRS"]] %>%
+if (length(str_which(var_topca, "-"))== 0){
+   prcompPe<-pe[["proteinRS"]] %>%
         filterNA() %>%
         assay() %>%
         t() %>%
         prcomp()
   
-  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ",v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[v]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
+  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
 		
-#        fviz_pca_ind(habillage = colData(pe)[[v]]  , geom=c("point"),  pointsize = 3, addEllipses=FALSE, repel = FALSE ,title = paste0("PCA by ",v))
- 
    plot(pca_)
+ } else {
 
-  # png(filename= file.path( params$folder_prj, "Result",paste0("PCA_",v ,".png")), width=12, height=12, res=200, units="in")
-  # plot(pca_)
-  # invisible(dev.off())
-
+	for (v in var_topca) {
+	 
+	 
+	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
+	  
+	  prcompPe<-pe[["proteinRS"]] %>%
+			filterNA() %>%
+			assay() %>%
+			t() %>%
+			prcomp()
+		
+	  first_comp<-comparisonPCA[1]
+	  second_comp<-comparisonPCA[2]
+	  
+	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
+	  break
+	  }else{
+	  
+		  if (is.numeric(colData(pe)[[first_comp]])){
+			num_comp<-first_comp
+			chr_comp<-second_comp
+			}else {
+			num_comp<-second_comp
+			chr_comp<-first_comp
+			}
+		  log_info(paste0("numerical ",num_comp))
+		  log_info(paste0("categorical ",chr_comp))
+		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
+				
+		 plot(pca_)
+		 
+		}
+	}
 }
-
-
 
 ```
 
