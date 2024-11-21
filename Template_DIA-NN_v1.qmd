@@ -216,10 +216,12 @@ if (check_groups$status == 1){
     stop(check_groups$error)
 }  
 
+  if (all(params$cofounder_list != '')) {
   check_cofounder_list<-checkCofounder(cofounder= params$cofounder_list, colsDesign=colnames(design))
 if (check_cofounder_list$status == 1){
     stop(check_cofounder_list$error)
 }
+  }
 #log_info(params$cofounder_list[1]) 
 
   
@@ -476,7 +478,7 @@ if (length(str_which(var_topca, "-"))== 0){
         t() %>%
         prcomp()
   
-  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
+  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) labs(colour=var_topca)
 		
    plot(pca_)
  } else {
@@ -508,7 +510,7 @@ if (length(str_which(var_topca, "-"))== 0){
 			}
 		  log_info(paste0("numerical ",num_comp))
 		  log_info(paste0("categorical ",chr_comp))
-		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1)))
+		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
 				
 		 plot(pca_)
 		 

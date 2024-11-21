@@ -42,6 +42,8 @@ The description of the paramaters is the following:
 - `ensembl_col`: list of the annotation fields that are added. last columns must be a gene symbol
 - `filtering_contaminats`: activate / deactivate the filtering of the contaminats
 - `contaminats_str`: string used to find the contaminats (e.g: Cont)
+- `cofounder_list`: list of the cofounder values to use in cofounder values analysis
+- `PCA_comparison`: list of cofounder values to use in PCA analysis
 
 ## Experiment Design File
 
@@ -63,3 +65,18 @@ A small example is the following:
 | B000266_ratio10_DIA| B000266_Ap_6883_EXT-765_DIA_Yeast_UPS2_ratio10_DIA.mzML | E | 1 |
 
 Remark : It is really important that the run name is also included in the DIA-NN report.
+
+The Experiment Design File can also include cofounder values that can be used in Cofoounder Values analysis and PCA plot.
+
+## Experiment Analysis
+- `Import Data` 
+- `Filtering steps` 
+- `Cofounder Vaues Analysis` : analysis of cofounder values among the groups
+- `Data Missing Analysis` : the plot shows the completeness of the experiments at precursor and summarized level
+- `Normalization` 
+- `PCA` : PCA plot by groups and cofounder values
+- `DE Analysis` 
+- `QC plots` 
+- `Group Comparison` : volcano plot that summarizes the differential expression landscape in the comparison between two groups
+- `Summary DE proteins` 
+- `Session Info` 
