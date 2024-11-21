@@ -9,12 +9,13 @@
 #' 
 #' @param data_: data frame containing the DIA-NN report data
 #' @param design: data frame containing experiment design data 
+#' @param q_feature: quantitative feature column to use 
 #'
 #' @return status : int 0 / 1 error found  
 #' @return type_raw: format file of the raw file detected ,
 #' @error error: error message
 
-check_design_data  <- function  (data_ , design){
+check_design_data  <- function  (data_ , design, q_feature){
   
   status <- 0
   type_raw <- NA
@@ -22,7 +23,7 @@ check_design_data  <- function  (data_ , design){
   
   
   ## check if precursor. translated is there  
-  min_col_need <- c("Precursor.Translated","Precursor.Normalised","Proteotypic","PG.Q.Value",
+  min_col_need <- c("Proteotypic","PG.Q.Value",
                   "Q.Value","Precursor.Id") 
   if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
     
@@ -32,6 +33,14 @@ check_design_data  <- function  (data_ , design){
      status <- 1
      #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
      return( list(status=status, type_raw=type_raw,error=error))
+  }
+  
+  min_precursor_col<- c("Precursor.Translated","Precursor.Normalised","Precursor.Quantity")
+  if (! any (min_precursor_col %in% q_feature)==TRUE){
+    error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
+    
+    status <- 1
+    return( list(status=status, type_raw=type_raw,error=error))
   }
   
   min_col_need_design <- c("sample","run", "group", "replicate") 

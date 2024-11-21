@@ -44,6 +44,7 @@ The description of the paramaters is the following:
 - `contaminats_str`: string used to find the contaminats (e.g: Cont)
 - `cofounder_list`: list of the cofounder values to use in cofounder values analysis
 - `PCA_comparison`: list of cofounder values to use in PCA analysis
+- `quantitatve_features`: quantitative feature column to use
 
 ## Experiment Design File
 
@@ -69,14 +70,13 @@ Remark : It is really important that the run name is also included in the DIA-NN
 The Experiment Design File can also include cofounder values that can be used in Cofoounder Values analysis and PCA plot.
 
 ## Experiment Analysis
-- `Import Data` 
-- `Filtering steps` 
-- `Cofounder Vaues Analysis` : analysis of cofounder values among the groups
-- `Data Missing Analysis` : the plot shows the completeness of the experiments at precursor and summarized level
-- `Normalization` 
-- `PCA` : PCA plot by groups and cofounder values
-- `DE Analysis` 
-- `QC plots` 
-- `Group Comparison` : volcano plot that summarizes the differential expression landscape in the comparison between two groups
-- `Summary DE proteins` 
-- `Session Info` 
+
+- `Filtering steps` : pre-processing steps
+- `Cofounder Vaues Analysis` : analysis of cofounder values among the groups.
+- `Data Missing Analysis` : the plot shows the completeness of the experiments at precursor and summarized level.
+- `Normalization` : Log 2 transformation, Normalization across all the samples using quantiles method, Summarization at protein level using medianPolish function
+- `PCA` : PCA plot by groups and cofounder values.
+- `DE Analysis` : Using MSqRob2 with the formula specified in input with ridge regression disabled
+- `QC plots` : P values distribution among groups comparisons
+- `Group Comparison` : volcano plot that summarizes the differential expression landscape in the comparison between two groups. Bar plots that summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values and log2 fold-change thresholds used to define the significance levels.
+- `Summary DE proteins` : summaries of the number of DE proteins found in all the comparisons and upset plot showing the overlapping of DE proteins among the comparisons. 

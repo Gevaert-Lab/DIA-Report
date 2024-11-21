@@ -42,6 +42,7 @@ params:
   ensembl_col: ""
   cofounder_list: ""
   PCA_comparison: "Group"
+  quantitatve_features: "Precursor.Quantity"
 ---
 
 <!-- <style> -->
@@ -203,9 +204,9 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
    
-  dfMsqrob <- dfToWideMsqrob( data, precursorquan = "Precursor.Translated")
+  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features)
  
-  result_check <- check_design_data(data,design) 
+  result_check <- check_design_data(data,design,params$quantitatve_features) 
   
   if (result_check$status == 1 |  is.na(result_check$type_raw) ){
     stop(result_check$error)
@@ -478,7 +479,7 @@ if (length(str_which(var_topca, "-"))== 0){
         t() %>%
         prcomp()
   
-  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) labs(colour=var_topca)
+  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=var_topca)
 		
    plot(pca_)
  } else {
