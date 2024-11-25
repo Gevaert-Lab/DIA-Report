@@ -640,26 +640,28 @@ for (a in params$comparisons){
 In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
 
 ```{r upset plot}
-    listInput <- list()
-    df_summary = data.frame(matrix(NA, ncol=1, nrow=4)[-1])
-    for (cmp in names(test)){
-         cmp_label <- gsub(params$contrast,'',cmp )
-         total =  dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') )[1]
-         up  = dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP') )[1]
-         down  =   dim(test[[cmp]]$toptable %>% filter(differential_expressed =='DOWN') )[1]
-         log_info(cmp)
-         log_info(total)
-         df_summary[[cmp_label]]  <- c(total, up,down)
-         if (total >  0){
-           
-           listInput[[cmp_label]] <- test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') %>% pull(Protein.Names)
-           }
-        
-      
-    }
-    rownames(df_summary) <- c('Total DE','Up DE','Down DE')
-    #log_info(listInput[[cmp_label]])
-    df_summary <- df_summary[,-1]
+listInput <- list()
+df_summary = as.data.frame(matrix(ncol=3, nrow=0))
+i <- 1 
+for (cmp in names(test)){
+  cmp_label <- gsub(params$contrast,'',cmp )
+  total =  dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') )[1]
+  up  = dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP') )[1]
+  down  =   dim(test[[cmp]]$toptable %>% filter(differential_expressed =='DOWN') )[1]
+  log_info(cmp)
+  log_info(total)
+  #df_summary[[cmp_label]]  <- c(total, up,down)
+  df_summary[i,1]  <- total
+  df_summary[i,2]  <- up
+  df_summary[i,3]  <- down
+
+  if (total >  0){
+    listInput[[cmp_label]] <- test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') %>% pull(Protein.Names)
+  }
+  i <- i+1
+}
+rownames(df_summary) <- names(test) 
+colnames(df_summary) <- c('Total DE','Up DE','Down DE')
     #log_info(df_summary)
     ## visual table summary
     DT::datatable( df_summary  ,
