@@ -203,10 +203,15 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-   
+  checkDIANN<-check_DIANN_report(data, q_feature=params$quantitatve_features)
+    
+  if (checkDIANN$status == 1 ) {
+    stop(checkDIANN$error)
+    } 
+  
   dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features)
  
-  result_check <- check_design_data(data,design,params$quantitatve_features) 
+  result_check <- check_design_data(dfMsqrob,design) 
   
   if (result_check$status == 1 |  is.na(result_check$type_raw) ){
     stop(result_check$error)
@@ -282,11 +287,14 @@ custom_col <- setdiff(colnames(design),min_col_need_design )
 
 if (length(custom_col) >= 1){
     for (col_add in custom_col){
-      colData(pe)[[col_add]] <-  design[[col_add]]
        
       if  (is.character(design[[col_add]])) {
-          design[[col_add]]<- as.factor(design[[col_add]])
-  	   }
+        log_info(paste('Chr ', col_add))
+          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
+      }else{  
+        log_info(paste('Num ', col_add))
+  	     colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
+      }
       
       }
 }
@@ -393,7 +401,7 @@ list_character <- list()
 
 if (all(params$cofounder_list != '')) {
   for  (col in params$cofounder_list){
-     if  (is.character(cData[[col]])) {
+     if  (is.factor (cData[[col]])) {
        log_info(paste0('Character - ', col))
        list_character <- append(list_character, col)
         
@@ -595,17 +603,18 @@ for (a in params$comparisons){
     cat( '## ', paste(cmp_label,sep=' '), '\n\n')
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
-
+    log_info('Volcano')
     render_child(data = test[[cmp]],path=file.path( params$folder_prj, "Result","Contrast",cmp),  template='_templateContrast.Rmd') 
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
     #print(filt_val) 
     
-    if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] == 0 ){
-      cat(' Not Significant proteins to be visualized in in the  heatmap \n')
+    if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
+      cat(' Not Significant proteins  to be visualized in in the  heatmap \n')
     }else{
-    render_child(data = test[[cmp]], pe = pe
+    log_info('Heatmap')
+      render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
                  path= file.path(  params$folder_prj, "Result","Contrast",cmp),
                  template='_templateHeatmap.Rmd')
@@ -614,6 +623,7 @@ for (a in params$comparisons){
     cat('\n\n')
     cat('\n\n')
     cat('These bar plots summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
+    log_info('renderChild')
     render_child(data = test[[cmp]],
                  path= file.path( params$folder_prj, "Result","Contrast",cmp),
                  template='_templateBarPlot.Rmd')

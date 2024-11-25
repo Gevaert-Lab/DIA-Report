@@ -1,49 +1,70 @@
 
 
-######------check_design_data-----------------------------------------------------
-#' @author Andrea Argentini
-#' check_design_data
+######------check_DIANN_report-----------------------------------------------------
+#' @author
+#' check_DIANN_report
 #' This function checks some main sanity controls for the data retrieved in DIA 
 #' report and in experiment design file 
 #'Remark : Model result are supposed to be in proteinRS layer.
 #' 
 #' @param data_: data frame containing the DIA-NN report data
-#' @param design: data frame containing experiment design data 
 #' @param q_feature: quantitative feature column to use 
 #'
 #' @return status : int 0 / 1 error found  
 #' @return type_raw: format file of the raw file detected ,
 #' @error error: error message
 
-check_design_data  <- function  (data_ , design, q_feature){
+check_DIANN_report <- function  (data_ , q_feature){
   
   status <- 0
-  type_raw <- NA
   error <-
-  
-  
-  ## check if precursor. translated is there  
-  min_col_need <- c("Proteotypic","PG.Q.Value",
-                  "Q.Value","Precursor.Id") 
-  if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
     
-     #cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' )  
-     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' ) )
-    
-     status <- 1
-     #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
-     return( list(status=status, type_raw=type_raw,error=error))
-  }
-  
-  min_precursor_col<- c("Precursor.Translated","Precursor.Normalised","Precursor.Quantity")
+    min_precursor_col<- c("Precursor.Translated","Precursor.Normalised","Precursor.Quantity")
   if (! any (min_precursor_col %in% q_feature)==TRUE){
     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
     
     status <- 1
-    return( list(status=status, type_raw=type_raw,error=error))
+    return( list(status=status,error=error))
   }
   
-  min_col_need_design <- c("sample","run", "group", "replicate") 
+  ## check if precursor. translated is there  
+  min_col_need <- c("Proteotypic","PG.Q.Value",
+                    "Q.Value","Precursor.Id") %>% append(q_feature)
+  if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
+    
+    #cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' )  
+    error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' ) )
+    
+    status <- 1
+    #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
+    return( list(status=status, error=error))
+  }
+  
+  return(list(status=status))
+  
+}
+  
+  
+  ######------check_design_data-----------------------------------------------------
+  #' @author Andrea Argentini
+  #' check_design_data
+  #' This function checks some main sanity controls for the data retrieved in DIA 
+  #' report and in experiment design file 
+  #'Remark : Model result are supposed to be in proteinRS layer.
+  #' 
+  #' @param data_: data frame containing the DIA-NN report data
+  #' @param design: data frame containing experiment design data 
+  #'
+  #' @return status : int 0 / 1 error found  
+  #' @return type_raw: format file of the raw file detected ,
+  #' @error error: error message
+ 
+check_design_data  <- function  (data_ , design){
+  status <- 0
+  type_raw <- NA
+  error <-
+
+ min_col_need_design <- c("sample","run", "group", "replicate") 
   if  ( ! all( min_col_need_design %in% colnames(design)) == TRUE){
     #cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' )  
     #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
@@ -52,11 +73,11 @@ check_design_data  <- function  (data_ , design, q_feature){
     return(list(status=status, type_raw=type_raw,error=error))
   }
   
-  data_sample <- data %>% dplyr::distinct(File.Name) %>% pull()
+  data_sample <- colnames(data_)[10:length(colnames(data_))]
   d_sample <- design %>% dplyr::select(sample) %>% pull()
-  
+  #data %>% dplyr::distinct(File.Name) %>% pull()
   type_raw <- ''
-     
+  
   if (! length(data_sample) == length(d_sample)){
     #cat ( 'Number of samples in the design file and in DIA-NN does not match')
     error <- 'Number of samples in the design file and in DIA-NN does not match'
@@ -64,13 +85,15 @@ check_design_data  <- function  (data_ , design, q_feature){
     return(list(status=status, type_raw=type_raw,error=error))
   }
   
-  # no error exit 
+  #no error exit 
   #str_match(data_sample,'\\..*')
   type_raw <- str_match(data_sample,'\\..*')[,1][1]
   
   return(list(status=status, type_raw=type_raw))
   
 }
+
+
 
 ######-----dfToWideMsqrob-------------------------
 #' @author Leander 
