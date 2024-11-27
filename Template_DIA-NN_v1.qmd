@@ -40,7 +40,7 @@ params:
   folder_prj: ""
   ensembl_annotation: ""
   ensembl_col: ""
-  cofounder_list: ""
+  confounder_list: ""
   PCA_comparison: "Group"
   quantitatve_features: "Precursor.Quantity"
 ---
@@ -222,13 +222,13 @@ if (check_groups$status == 1){
     stop(check_groups$error)
 }  
 
-  if (all(params$cofounder_list != '')) {
-  check_cofounder_list<-checkCofounder(cofounder= params$cofounder_list, colsDesign=colnames(design))
-if (check_cofounder_list$status == 1){
-    stop(check_cofounder_list$error)
+  if (all(params$confounder_list != '')) {
+  check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+if (check_confounder_list$status == 1){
+    stop(check_confounder_list$error)
 }
   }
-#log_info(params$cofounder_list[1]) 
+#log_info(params$confounder_list[1]) 
 
   
   if ( .Platform$OS.type == "unix" ){
@@ -299,9 +299,9 @@ if (length(custom_col) >= 1){
       }
 }
 
-  check_cofounder_PCA<-checkCofounder(cofounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
-if (check_cofounder_PCA$status == 1){
-    stop(check_cofounder_PCA$error)
+  check_confounder_PCA<-checkConfounder(confounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
+if (check_confounder_PCA$status == 1){
+    stop(check_confounder_PCA$error)
 }
 
 
@@ -392,15 +392,15 @@ if ( ! params$ensembl_annotation == ''){
 
 ```
 
-## Cofounder Values Analysis
-```{r cofounder_value_analysis}
+## Confounder Values Analysis
+```{r confounder_value_analysis}
 # saveRDS(pe, file="C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe-obj.rds")
 cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
 
-if (all(params$cofounder_list != '')) {
-  for  (col in params$cofounder_list){
+if (all(params$confounder_list != '')) {
+  for  (col in params$confounder_list){
      if  (is.factor (cData[[col]])) {
        log_info(paste0('Character - ', col))
        list_character <- append(list_character, col)
@@ -415,10 +415,25 @@ if (all(params$cofounder_list != '')) {
   
   boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
+  
+
+		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  print(boxplot_num)
+               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_num.pdf')),paper="a4")
+               boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  print(boxplot_num)
+      invisible(dev.off())
+      
+  
   for (col_ch in unlist(list_character)){
     log_info(col_ch)
     boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
+          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch.pdf')),paper="a4")
+         boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    print(boxplot_ch)  
+     
+      invisible(dev.off())
   }
 
 }
@@ -522,6 +537,13 @@ if (length(str_which(var_topca, "-"))== 0){
 		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
 				
 		 plot(pca_)
+		 
+		          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
+		    log_info(file.path(params$folder_prj,"Result"))
+		           pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
+		           plot(pca_)
+     
+      invisible(dev.off())
 		 
 		}
 	}
