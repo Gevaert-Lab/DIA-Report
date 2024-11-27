@@ -24,14 +24,14 @@ library(logger)
 
 
 
-report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort'
+report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2'
 
-input_report_parameter <- list(title =  "CMB1023-ValCohort",
+input_report_parameter <- list(title =  "DIANN_Ecoli_spikeUPS2",
                                subtitle = 'This is a subtitle', 
                                author= 'Your Name',
                                description= '',
-                               input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort\\CMB1366_MPM_historical_Glyco_report.tsv',
-                               design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort\\cofounder_values.csv',
+                               input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2\\report.tsv',
+                               design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2\\annotation_DIA_dummy_v2.csv',
                                folder_prj = report_target_folder ,
                                contrast= 'Group',
                                aggr_method= 'medianPolish',
@@ -40,18 +40,18 @@ input_report_parameter <- list(title =  "CMB1023-ValCohort",
                                Proteotypic = TRUE,
                                pep_per_prot= 3,
                                nNonZero= 30,
-                               comparisons= c('GroupAEX - GroupHC','GroupMPM - GroupHC'),
-                               confounder_list= c('packages_year', 'sex', 'BMI'),
-                               PCA_comparison = c('Group-packages_year', 'sex-BMI'),
+                               comparisons= c('GroupA - GroupB', 'GroupA - GroupC'),
+                               quantitatve_features= 'Precursor.Translated',
                                filtering_contaminats= FALSE 
                                
 )
+# 'GroupA - GroupD'
                                
 filename_target <- paste0( 'DIA_TEMPLATE',
                           ".html")
 # run quarto render
 quarto_render(input= 'Template_DIA-NN_v1.qmd',
-             output_format = 'html', 
+             output_format = 'html',
              output_file= filename_target,
              execute_params= input_report_parameter)
 

@@ -296,20 +296,20 @@ checkGroups<- function (inputParams, dfDesign){
   
 }
 
-######------checkCofounderList-----------------------------------------------------
+######------checkConfounderList-----------------------------------------------------
 #' @author Caterina Lizzio
-#' checkCofounderList
-#' This function checks if cofounder values in input are present in design file
+#' checkConfounderList
+#' This function checks if confounder values in input are present in design file
 #' 
-#' @param cofounder: cofounder values in input 
+#' @param confounder: confounder values in input 
 #' @param colsDesign: colnames in design data 
 #'
 #' @return status : int 0 / 1 error found  
 #' @error error: error message
-checkCofounder<- function (cofounder, colsDesign) {
+checkConfounder<- function (confounder, colsDesign) {
 
-  if (! all (cofounder %in%  colsDesign))  { 
-    error <-  capture.output( cat ( 'cofounder values are not present in design file' ) )
+  if (! all (confounder %in%  colsDesign))  { 
+    error <-  capture.output( cat ( 'confounder values are not present in design file' ) )
     status <- 1
     return( list(status=status,error=error))
   } else {
