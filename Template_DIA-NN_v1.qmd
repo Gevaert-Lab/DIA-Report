@@ -191,7 +191,7 @@ if (!dir.exists(file.path(params$folder_prj))){
 
 ## Import data
 
-Reading DIA data from **`r params$input_file`** using *Precursor.Translated* intensities from DIA-NN.
+Reading DIA data from **`r basename(params$input_file)`** using *Precursor.Translated* intensities from DIA-NN.
 
 All the precursors with *Q-value \< 0.01* are used for the analysis.
 
@@ -217,6 +217,20 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
     stop(result_check$error)
   }  
   
+  
+  checkLength<-check_length_design_data(dfMsqrob, design)
+
+  if (checkLength$status==1){
+	stop(checkLength$error)
+  }
+  
+  if (checkLength$status==2){
+  dfMsqrob <- checkLength$data_
+  log_info(checkLength$message)
+  #checkLength$message
+  }
+  
+  
   check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
 if (check_groups$status == 1){
     stop(check_groups$error)
@@ -237,15 +251,17 @@ if (check_confounder_list$status == 1){
    base_name_sample =  basename(filename) ) 
   
   }else{
-    samplenames <- tibble(
-   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
+ #    samplenames <- tibble(
+#   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
+ #  base_name_sample =  basename(filename) ) 
+    
+  samplenames <- tibble(
+  filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
    base_name_sample =  basename(filename) ) 
     
-  }
+    
+    }
   
-  samplenames <- tibble(
-   filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
-   base_name_sample =  basename(filename) ) 
   
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
  

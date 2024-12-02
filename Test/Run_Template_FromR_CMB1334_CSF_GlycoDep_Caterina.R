@@ -24,30 +24,27 @@ library(logger)
 
 
 
-report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19'
+report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep'
 
-input_report_parameter <- list(title =  "CMB-EBC-DIANN19",
+input_report_parameter <- list(title =  "CMB1334_CSF_GlycoDep",
                                subtitle = 'This is a subtitle', 
                                author= 'Your Name',
-                               description= '',
-                               input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19\\EBC_ONDev_1_9report.tsv',
-                               design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19\\metadata_2DIAReport.csv',
+                               description= 'Yeast as background and USP2 proteins spiked in different concentration. This Experiment is designed for DIA benchmarking of different workflow using DIA-NN.',
+                               input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep\\CMB1334_GD_Plasma_19022024db.report.tsv',
+                               design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep\\final_metadata_2DIAreport.csv',
                                folder_prj = report_target_folder ,
                                contrast= 'Group',
                                aggr_method= 'medianPolish',
                                normalization ='quantiles',
-                               formula = '~ -1 + Group + BMI + Packyears + Age + Smokestat + Gender',
+                               formula = '~ -1 + Group',
                                Proteotypic = TRUE,
                                pep_per_prot= 3,
                                nNonZero= 30,
-                               comparisons= c('GroupAEX - GroupHC', 'GroupLC - GroupHC','GroupMPM - GroupHC'),
-                               confounder_list= c('Packyears', 'BMI', 'Age', 'Smokestat', 'Gender'),
-                               PCA_comparison = c('Group-Packyears', 'BMI-Gender'),
+                               comparisons= c('GroupTau - GroupTDP'),
                                quantitatve_features= 'Precursor.Quantity',
                                filtering_contaminats= FALSE 
                                
 )
-# 'GroupLC - GroupHC','GroupMPM - GroupHC', 'GroupLC - GroupHC'
                                
 filename_target <- paste0( 'DIA_TEMPLATE',
                           ".html")

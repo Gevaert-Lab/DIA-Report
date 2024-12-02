@@ -4,7 +4,7 @@
 #' @author
 #' check_DIANN_report
 #' This function checks some main sanity controls for the data retrieved in DIA 
-#' report and in experiment design file 
+#' report 
 #'Remark : Model result are supposed to be in proteinRS layer.
 #' 
 #' @param data_: data frame containing the DIA-NN report data
@@ -18,7 +18,7 @@ check_DIANN_report <- function  (data_ , q_feature){
   
   status <- 0
   error <-
-    
+    ## check if precursor. translated is there  
     min_precursor_col<- c("Precursor.Translated","Precursor.Normalised","Precursor.Quantity")
   if (! any (min_precursor_col %in% q_feature)==TRUE){
     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
@@ -27,7 +27,7 @@ check_DIANN_report <- function  (data_ , q_feature){
     return( list(status=status,error=error))
   }
   
-  ## check if precursor. translated is there  
+ 
   min_col_need <- c("Proteotypic","PG.Q.Value",
                     "Q.Value","Precursor.Id") %>% append(q_feature)
   if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
@@ -63,6 +63,8 @@ check_design_data  <- function  (data_ , design){
   status <- 0
   type_raw <- NA
   error <-
+    
+  data_sample <- colnames(data_)[10:length(colnames(data_))]
 
  min_col_need_design <- c("sample","run", "group", "replicate") 
   if  ( ! all( min_col_need_design %in% colnames(design)) == TRUE){
@@ -73,26 +75,66 @@ check_design_data  <- function  (data_ , design){
     return(list(status=status, type_raw=type_raw,error=error))
   }
   
-  data_sample <- colnames(data_)[10:length(colnames(data_))]
-  d_sample <- design %>% dplyr::select(sample) %>% pull()
-  #data %>% dplyr::distinct(File.Name) %>% pull()
-  type_raw <- ''
-  
-  if (! length(data_sample) == length(d_sample)){
-    #cat ( 'Number of samples in the design file and in DIA-NN does not match')
-    error <- 'Number of samples in the design file and in DIA-NN does not match'
-    status <- 1
-    return(list(status=status, type_raw=type_raw,error=error))
-  }
-  
-  #no error exit 
-  #str_match(data_sample,'\\..*')
   type_raw <- str_match(data_sample,'\\..*')[,1][1]
   
   return(list(status=status, type_raw=type_raw))
   
 }
 
+######------check_length_design_data-----------------------------------------------------
+#' @author 
+#' check_length_design_data
+#' This function checks the names and the number of samples in DIA-NN report and experiment design data,
+#' if DIA-NN report has more samples than design file, only sample present in design file are kept.
+#'Remark : Model result are supposed to be in proteinRS layer.
+#' 
+#' @param data_: data frame containing the DIA-NN report data
+#' @param design: data frame containing experiment design data 
+#'
+#' @return status : int 0 / 1: error found, 2: samples in DIA-NN report are more than samples in experiment design data 
+
+#' @error error: error message
+#' @return message: message returned if data frame containing the DIA-NN report data is filtered
+
+check_length_design_data  <- function  (data_ , design){
+  status <- 0
+  error <- ''
+  message <- ''
+  
+  data_sample <- colnames(data_)[10:length(colnames(data_))]
+  d_sample <- design %>% dplyr::select(filename) %>% pull()
+  
+  
+  if (length(data_sample) < length(d_sample)){
+    
+    error <- 'Number of samples in the design file and in DIA-NN does not match'
+    status <- 1
+    return(list(status=status,error=error,message=message))
+  }
+  
+  if (!any(d_sample %in% data_sample)){
+    error <- 'Samples in the design file and in DIA-NN do not match'
+    status <- 1
+    return(list(status=status,error=error,message=message))	
+  }
+  
+  if (length(data_sample) > length(d_sample)){
+    status <- 2
+    dfSample<- dfMsqrob[,(colnames(dfMsqrob)%in% d_sample)]
+    df  <- cbind(dfMsqrob[, c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
+                        "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")], dfSample)
+    message <- 'Number of samples in DIA-NN is bigger than number of samples in design file.'
+    return(list(status=status, error = error, message=message , data_ = df))
+  }else{
+    return(list(status=status,error=error,message=message))  
+  }
+  
+  #no error exit 
+  #str_match(data_sample,'\\..*')
+  #type_raw <- str_match(data_sample,'\\..*')[,1][1]
+  
+  
+} 
 
 
 ######-----dfToWideMsqrob-------------------------
