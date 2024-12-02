@@ -428,10 +428,6 @@ if (all(params$confounder_list != '')) {
   }
   
   cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
-  
-  boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
-  print(boxplot_num)
-  
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
