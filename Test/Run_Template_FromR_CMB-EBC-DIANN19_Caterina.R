@@ -26,10 +26,10 @@ library(logger)
 
 report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19'
 
-input_report_parameter <- list(title =  "CMB-EBC-DIANN19",
-                               subtitle = 'This is a subtitle', 
-                               author= 'Your Name',
-                               description= '',
+input_report_parameter <- list(title =  "EBC Cohort",
+                               subtitle = 'DE Analsysis', 
+                               author= ' A. Argentini',
+                               description= 'Cohort includes 145 exhaled breath condensate patient sample (EBC) from Mesothelioma, lung cancer, exposed to Asbestos and healthy patients. Data was acquired in DIA mode and processed with DIA-NN 1.9.',
                                input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19\\EBC_ONDev_1_9report.tsv',
                                design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB-EBC-DIANN19\\metadata_2DIAReport.csv',
                                folder_prj = report_target_folder ,

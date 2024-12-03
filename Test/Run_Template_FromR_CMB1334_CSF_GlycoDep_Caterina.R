@@ -26,10 +26,10 @@ library(logger)
 
 report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep'
 
-input_report_parameter <- list(title =  "CMB1334_CSF_GlycoDep",
+input_report_parameter <- list(title =  "CSF  Glyco Depleted",
                                subtitle = 'This is a subtitle', 
                                author= 'Your Name',
-                               description= 'Yeast as background and USP2 proteins spiked in different concentration. This Experiment is designed for DIA benchmarking of different workflow using DIA-NN.',
+                               description= 'CSF samples from FTLD patients including Tau and TDP mutation.',
                                input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep\\CMB1334_GD_Plasma_19022024db.report.tsv',
                                design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1334_CSF_GlycoDep\\final_metadata_2DIAreport.csv',
                                folder_prj = report_target_folder ,

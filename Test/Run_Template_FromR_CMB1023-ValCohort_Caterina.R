@@ -26,10 +26,10 @@ library(logger)
 
 report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort'
 
-input_report_parameter <- list(title =  "CMB1023-ValCohort",
-                               subtitle = 'This is a subtitle', 
-                               author= 'Your Name',
-                               description= '',
+input_report_parameter <- list(title =  "Plasma Validation Cohort",
+                               subtitle = 'DE Analysis', 
+                               author= 'A.Argentini',
+                               description= 'Validation cohort of 76 plasma samples. Patients are stratified in mesothelioma, lung cancer, exposed to Asbestos and healthy ',
                                input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort\\CMB1366_MPM_historical_Glyco_report.tsv',
                                design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\CMB1023-ValCohort\\cofounder_values.csv',
                                folder_prj = report_target_folder ,
