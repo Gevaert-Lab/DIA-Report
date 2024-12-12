@@ -707,15 +707,18 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
     # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
     log_info({length(listInput)})
  if (length(listInput)>=2 ) {
-    upset(fromList(listInput), order.by = "freq")
+    print (upset(fromList(listInput), order.by = "freq"))
      
       pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
        
-     upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
+     print( upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")) 
+     
       invisible(dev.off())
+      
+      
  
 }
-    #print(listInput)
+    
     #upset(fromList(listInput), order.by = "freq")
      
 # pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
