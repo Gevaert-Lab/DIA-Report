@@ -2,6 +2,10 @@
 
 ```{r}
 library(reshape2)
+
+log_info("inside BArPlot")
+label_work <- gsub('Group','',label)
+  label_work_f <- gsub(' ','_',label_work)
 DE <- data$toptable
 
 filterUP <- function(DE, log2fc = 0, p = 0.1) {
@@ -30,7 +34,7 @@ mdata <- melt(summary, id.vars = c('logFC', 'adjPval'))
 p <- ggplot(mdata, aes(x = logFC, y = value)) + 
   geom_bar(aes(fill = variable), stat = 'identity', position = 'dodge') + 
   facet_grid(~ adjPval) + theme(legend.position = 'bottom', legend.title = element_blank()) + 
-  labs(title = 'Number of differentially up/down regulated proteins', 
+  labs(title = 'Number of differentially up/down regulated protein / peptide', 
        subtitle = 'based on different adjusted p-value and log2foldChange cut-off values')
 
 

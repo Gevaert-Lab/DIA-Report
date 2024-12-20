@@ -198,7 +198,8 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
     temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names, head(params$ensembl_col,-1) ) 
     
   }else{
-    temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names ) 
+    perc_field <- rowData(pe[['proteinRS']]) %>% colnames() %>%  stringr::str_subset('perc') 
+    temp <- as.data.frame(rowData(data[['proteinRS']])) %>% rownames_to_column('Uniprot_id') %>%      dplyr::select(Uniprot_id,Genes, Protein.Names, perc_field ) 
   }
   
   
@@ -222,7 +223,7 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
       scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
       ggtitle(paste0("Volcano ",cmp) )
     
-    DEall <- all_res[!is.na(all_res$adjPval) ,append(c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed"),head(params$ensembl_col,-1) ) ]
+    DEall <- all_res[!is.na(all_res$adjPval) ,append(c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed",perc_field),head(params$ensembl_col,-1) ) ]
     
       }else{
 
@@ -236,9 +237,10 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
       scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
       ggtitle(paste0("Volcano ",cmp) )
     
-    
-   
-    DEall <- all_res[!is.na(all_res$adjPval) ,c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed")]
+    perc_field <- rowData(pe[['proteinRS']]) %>% colnames() %>%  stringr::str_subset('perc') 
+    #log_info({c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)})
+    #log_info(head(all_res))
+    DEall <- all_res[!is.na(all_res$adjPval) , c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
   }
   ## volcano annotate with gene name 
   p_toFile <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
@@ -256,6 +258,86 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
 }
 
 
+######--- DEP_volcano_peptide----------------------------
+#' @author Andrea Argentini 
+#' DEP_volcano
+#' This function computes volcano plot and gives the toptable for each contrast.
+#' Remark : Model result are supposed to be in proteinRS layer.
+#' @param: label contrast name 
+#' @param: data Qfeatures object
+#' @param: imagesDir  folder where to save Volcano and toptable (as excel)
+#' @param: params document parameters list
+#'  @return toptable  toptable result as dataframe (with annotation added) 
+#'  @return volcano volcano ggplot object
+#' @return volcano volcano ggplot object
+
+
+DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
+  #quantile_protein
+  #data_selector= 'batch_corrected'
+  cmp = label
+  all_res <-  rowData(data[['peptideNorm']])[[label]]
+  
+  all_res <- all_res %>% rownames_to_column(var = 'precursor_id' )
+  
+  perc_field <- rowData(pe[['peptideNorm']]) %>% colnames() %>%  stringr::str_subset('perc') 
+  
+  temp <- as.data.frame(rowData(data[['peptideNorm']])) %>% rownames_to_column('precursor_id') %>% select(precursor_id,Genes, Protein.Ids, Protein.Names,perc_field ) 
+  
+  all_res <-  all_res %>% left_join( temp, by=join_by(precursor_id)) 
+  
+  
+  all_res <- all_res[ ! is.na(all_res$adjPval),]
+  all_res$differential_expressed <- "NO"
+  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
+  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "DOWN"
+  #sprintf("Protein_name: %s<br> Gene: %s", all_res$Protein.names, all_res$Gene_symbol)
+  
+  if ( ! params$ensembl_annotation == '') {
+    ## adding ensemble annotation
+    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s  <br> Chromosome name: %s",   all_res$Protein.Names, all_res$Genes,all_res$chromosome_name)   )  )  +
+      geom_point() +
+      theme_minimal() +
+      #geom_text_repel() +
+      geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+      geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+      scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+      ggtitle(paste0("Volcano ",cmp) )
+    
+    DEall <- all_res[!is.na(all_res$adjPval) ,append(c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed",perc_field),head(params$ensembl_col,-1) ) ]
+  }else{
+    
+    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s", all_res$Protein.Names, all_res$Genes)   )  )  +
+      geom_point() +
+      theme_minimal() +
+      #geom_text_repel() +
+      geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+      geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+      scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red")) +
+      ggtitle(paste0("Volcano ",cmp) )
+    
+   
+    DEall <- all_res[!is.na(all_res$adjPval) , c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
+    
+  }
+  
+  p_toFile <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                          label= Genes  )  )  +
+    geom_point() +
+    theme_minimal() +
+    geom_text_repel() +
+    geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+    geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+    scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+    ggtitle(paste0("Volcano ",cmp) )
+
+  
+  return ( list( toptable =DEall , volcano = p1, volcano2file =p_toFile ) )
+}
+
+
 ####----render_child-----
 #' render_child
 #' This function allow to render other template.Rmd in the main quarto document
@@ -265,21 +347,21 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
 #' @parma sample_rel
 #' @param template 
 #' @return none
-render_child <- function(data, path, pe, sample_rel,  template) {
-  if (missing(pe)  ){
-    # _templateContrast.Rmd _templateBArPlot.Rmd
+render_child <- function(data, path, pe, label , sample_rel,  template) {
+  if (missing(sample_rel)  ){
+    # _templateBArPlot.Rmd _templateContrast _templatePval
     res = knitr::knit_child(
       text = xfun::read_utf8( template),
-      envir = rlang::env(data = data, path = path),
+      envir = rlang::env(data = data, pe = pe,  label = label,  path = path),
       quiet = TRUE
     )
     cat(res, sep = '\n')
     cat("\n")
-  }else{
+  } else{
     # _templateHeatmap.Rmd
     res = knitr::knit_child(
       text = xfun::read_utf8( template),
-      envir = rlang::env(data = data, pe = pe, sample_rel = sample_rel, params =params, path = path),
+      envir = rlang::env(data = data, pe = pe, label = label , sample_rel = sample_rel, params =params, path = path),
       quiet = TRUE
     )
     cat(res, sep = '\n')

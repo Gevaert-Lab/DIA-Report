@@ -1,0 +1,62 @@
+
+
+```{r}
+library(pheatmap)
+library(dplyr)
+library(heatmaply)
+
+source('utils_function.R')
+
+required_packages = c("dplyr","heatmaply")
+#print(required_packages)
+check_dependencies(required_packages)
+log_info('Inside HEatmap')
+
+#selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))%>% rownames_to_column(var = "rowname") %>% pull(rowname) 
+
+selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))  %>% pull(precursor_id)
+
+
+app <- as.data.frame(colData(pe)) %>% filter( Group %in% sample_rel)%>% dplyr::select(- SampleName)  
+
+data <-  assay(pe[["peptideNorm"]])[selected,rownames(app)]
+saveRDS(data,file="heatmap.Rrs")
+
+log_info(dim(data)[1])
+log_info(dim(data)[2])
+if (dim(data)[1] > 5) {
+    if (dim(data)[1] >= 50 & dim(data)[2] < 25){
+      w <- 1200
+      h <- 900 
+  }else{
+      w <- 800
+      h <-  700
+  }
+    heatmaply(data, scale = "column",dendrogram =  "column",  width= w, height= h, cexRow = 1 ,cexCol = 1 )
+    
+    log_info('GG')
+    tmp <- heatmaply(data, scale = "column",dendrogram = "column", width= w, height= h,cexRow = 1, file =  file.path(path,paste0("Heatmap_DE_peptide",".pdf")))
+    rm(tmp)
+  } else {
+    cat ('Not enough DE proteins')
+}
+
+#  pdf(file = file.path(path,paste0("Heatmap_DE_proteins",".pdf")))
+#  p = pheatmap::pheatmap(data,
+#                             cluster_rows = FALSE,
+#                             scale = 'row',
+#                            show_rownames = TRUE,
+#                           show_colnames = FALSE,
+#                            annotation_col = app,
+#                            cluster_cols = FALSE,
+#                            fontsize_row = 10,
+#                            fontsize_col = 11,
+#                            width = 20,
+#                            height = 20,
+#                            main = 'Heatmap DE proteins')
+#   
+# print(p)
+#  dev.off()
+
+
+```
