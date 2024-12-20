@@ -2,9 +2,10 @@
 
 Welcome to DIA-Report! Your best buddy for DE report on DIA proteomics data.  
 
-With DIA-Report you can generate advanced differential expression analysis report based on **DIA-NN result**, in just one command.
+With DIA-Report you can generate advanced differential expression analysis  report based on **DIA-NN result**, in just one command.
 
 The statistical analysis is based on MSQrob2 and Qfeatures packages that allow to filter your data with various parameters and perform differential expression on proteomics data. The high number of parameters allows you to customized the analysis on your needs (normalization methods, missing value filtering, aggregation methods) and not rely in just black-box statistical analysis.
+
 
 ## Requirements
 
@@ -13,9 +14,20 @@ The statistical analysis is based on MSQrob2 and Qfeatures packages that allow t
 - Install phantomjs in you R installation `webshot::install_phantomjs()`
 - [Quarto](https://quarto.org/docs/download/) for the creation of html report
 
-## How to use it
+## How to generate the report
 
 `quarto render .\Template_DIA-NN_v1.qmd --execute-params parameters.yaml`
+
+in  the `parameters.yaml` you have an example.
+
+Alternatively, you can render the the report using quarto from `R`. See  `Run_Template_FromR.R` for more details.
+
+## Quarto Template
+
+The repository contains two Quarto templates:
+
+- `Template_DIA-NN_v1.qmd`: Template for protein level analysis report
+- `Template_DIA-NN_Peptide_v1.qmd` : Template for peptide level analysis report
 
 ## Input parameters
 The parameters must be indicated in a yaml file. You can an example in `parameters.yaml`.
@@ -32,9 +44,9 @@ The description of the paramaters is the following:
 - `contrast`: name of the column present in experiment design file used in the model. (default is Group)
 - `aggr_method`: summaration method used [medianPolish robustSummary() , colMeans(), colMedians(), base::colSums()]
 - `normalization`: normalization method [ sum, max, center.mean, center.median", div.mean, div.median", diff.meda, ⁠quantiles⁠, ⁠quantiles.robust⁠ , vsn]
-- `Proteotypic`: include only proteotypic peptides (Bool TRUE / FALSE )
+- `Proteotypic`: include only proteotypic peptides (Boolen: TRUE / FALSE )
 - `pep_per_prot`: number of peptides per proteins
-- `nNonZero`: minimum number of samples per peptides with non missing value
+- `nNonZero`: min percentage of samples with non missing value (used along with `filtPerGroup`)
 - `comparisons`: list of the comparison to use
 - `FC_thr`: log2FC threshold default 1
 - `adjpval_thr`: Statistical thresold to select significat hits adj.P-value default 0.05
@@ -45,6 +57,9 @@ The description of the paramaters is the following:
 - `cofounder_list`: list of the cofounder values to use in cofounder values analysis
 - `PCA_comparison`: list of cofounder values to use in PCA analysis
 - `quantitatve_features`: quantitative feature column to use
+- `filtPerGroup`: filtering of the NaN value based on `nNonZero` value applied per group (TRUE) or along all the sample (FALSE)
+
+Parameters can be also given as R list as showed in `Run_Template_FromR.R` and `Run_Template_FromR_peptide.R`.
 
 ## Experiment Design File
 
@@ -67,9 +82,11 @@ A small example is the following:
 
 Remark : It is really important that the run name is also included in the DIA-NN report.
 
-The Experiment Design File can also include cofounder values that can be used in Cofoounder Values analysis and PCA plot.
+The Experiment Design File can also include confounder values that can be used in confounder  analysis and PCA plot and in the linear model as fixed effect.
 
 ## Experiment Analysis
+
+Each report generated contains the following sections:
 
 - `Filtering steps` : pre-processing steps
 - `Cofounder Vaues Analysis` : analysis of cofounder values among the groups.
