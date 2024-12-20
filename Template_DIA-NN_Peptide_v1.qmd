@@ -1,0 +1,818 @@
+---
+title: "DE Analysis Report (Peptide): `r params$title`"
+subtitle: "`r params$subtitle`"
+author: "`r params$author`"
+format: 
+  html:
+    fig-width: 12
+    fig-height: 10
+    toc: true
+    toc-title: 'DE Analysis'
+    css: style.css
+    title-block-banner: '#1b2944'
+    title-block-banner-color: '#f79646'
+    include-in-header:
+      - text: |
+          <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+
+execute: 
+  echo: false
+  warning: false
+embed-resources: true
+theme: 
+ - brand 
+ - custom.scss
+
+params:
+  description: ""
+  title: ""
+  subtitle: ""
+  author: "" 
+  formula: ""
+  comparisons: ""
+  contrast: ""
+  input_file: ""
+  design_file: ""
+  FC_thr: 1
+  adjpval_thr: 0.05
+  Proteotypic: TRUE
+  pep_per_prot: 3
+  nNonZero: 30
+  aggr_method: "medianPolish"
+  normalization: "quantiles"
+  filtering_contaminats: ""
+  contaminats_str: ""
+  folder_prj: ""
+  ensembl_annotation: ""
+  ensembl_col: ""
+  confounder_list: ""
+  PCA_comparison: "Group"
+  quantitatve_features: "Precursor.Quantity"
+  filtPerGroup: TRUE
+---
+
+<!-- <style> -->
+
+<!-- #logo -->
+
+<!-- { -->
+
+<!--     position: relative; -->
+
+<!-- } -->
+
+<!-- #logo img { -->
+
+<!--     /*position: relative;*/ -->
+
+<!--     top: 25px; -->
+
+<!--     /*right: 0px;*/ -->
+
+<!--     left: 50px; -->
+
+<!--     position: fixed; -->
+
+<!--     width: 125px; -->
+
+<!--     } -->
+
+<!-- #header .btn-group { -->
+
+<!--     display: none; -->
+
+<!-- } -->
+
+<!-- body -->
+
+<!-- { -->
+
+<!--     position: absolute; -->
+
+<!--     top: 150px; -->
+
+<!-- } -->
+
+<!-- </style> -->
+
+<!-- <div id="logo" align="top"> -->
+
+<!-- ```{r echo = FALSE} -->
+
+<!-- knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg') -->
+
+<!-- ``` -->
+
+<!-- </div> -->
+
+```{r input}
+ #| output: false
+
+#includes:
+#      in-header: header.html
+source('utils_function.R')
+
+required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander')
+#print(required_packages)
+check_dependencies(required_packages)
+# 
+# library(QFeatures)
+# library(msqrob2)
+# library(readxl)
+# library(SummarizedExperiment)
+# library(visdat)
+# library(ggrepel)
+# library(dplyr)
+# library(tidyverse)
+# library(magrittr)
+# library(here)
+# library(tidyr)
+# library(plotly)
+# library(DT)
+# library(tibble)
+# library(MSnbase)
+# library(factoextra)
+# library(hrbrthemes)
+# library(gridExtra)
+# library(UpSetR)
+#library(heatmaply)
+# #webshot::install_phantomjs()
+```
+
+## Experiment Description 
+
+`r params$description`
+
+```{r check_parameter}
+## set the logger
+log_threshold(INFO)
+log_appender(appender_console)
+log_appender(appender_file("logfile_peptide.log"), index = 2)
+
+formatter_data_frame <- function(df, ...) {
+     pander::pander_return(df, style = 'simple')
+}
+log_formatter(formatter_data_frame)
+log_formatter(formatter_glue)
+
+
+
+if (params$contrast == '' ){
+  stop("Check parameter file: contrast is not set" )
+}
+
+if (all(params$comparisons == '') ){
+  stop("Check parameter file: comparisons is not set" )
+}
+
+if ( ! params$aggr_method %in% c('robustSummary','medianPolish','colMeans','colMedians')) {
+  stop('normalization method not allowed.  Methods allowed are : [ robustSummary, medianPolish, colMeans ]' )
+}
+if (params$aggr_method  == 'medianPolish'){
+  aggr_method_f <- MsCoreUtils::medianPolish
+}
+if (params$aggr_method  == 'RobustSummary'){
+  aggr_method_f <- RobustSummary
+}
+if (params$aggr_method  == 'colMeans'){
+  aggr_method_f <- base::colMeans
+}
+if (params$aggr_method  == 'colMeadians'){
+  aggr_method_f <- matrixStats:::colMedians
+}
+
+if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", "quantiles","quantiles.robust","vsn") ){ 
+   stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
+}
+
+if (params$filtering_contaminats){
+   if (params$contaminats_str == ""){
+     stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminats,..)")
+   } 
+}
+  ## to do visualize input contaminats_str(".","Result"))){
+#   dir.create('./Result')
+# }
+# make a subfolder for each contrast
+if (!dir.exists(file.path(params$folder_prj))){
+  dir.create(file.path( params$folder_prj),recursive = TRUE)
+}
+ dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
+ min_col_need_design <- c("sample","run", "group", "replicate","filename")
+
+
+```
+
+## Import data
+
+Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitatve_features`* from DIA-NN as quantitative features.
+All the precursors with *Q-value \< 0.01* are used for the analysis.
+
+```{r import data}
+  # 'peptidesRCB.txt'  
+
+  data <- read.csv(params$input_file,sep='\t')
+  ## deal csv  with different separated values 
+  L <- readLines(params$design_file, n = 1)
+  if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
+
+  checkDIANN<-check_DIANN_report(data, q_feature=params$quantitatve_features)
+    
+  if (checkDIANN$status == 1 ) {
+    stop(checkDIANN$error)
+    } 
+  
+  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features)
+ 
+  result_check <- check_design_data(dfMsqrob,design) 
+  
+  if (result_check$status == 1 |  is.na(result_check$type_raw) ){
+    stop(result_check$error)
+  }  
+  
+  
+  checkLength<-check_length_design_data(dfMsqrob, design)
+
+  if (checkLength$status==1){
+	stop(checkLength$error)
+  }
+  
+  if (checkLength$status==2){
+  dfMsqrob <- checkLength$data_
+  log_info(checkLength$message)
+  #checkLength$message
+  }
+  
+  
+  check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
+if (check_groups$status == 1){
+    stop(check_groups$error)
+}  
+
+  if (all(params$confounder_list != '')) {
+  check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+if (check_confounder_list$status == 1){
+    stop(check_confounder_list$error)
+}
+  }
+#log_info(params$confounder_list[1]) 
+
+  
+  if ( .Platform$OS.type == "unix" ){
+    samplenames <- tibble(
+   filename = gsub('\\\\','/' ,names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)]), 
+   base_name_sample =  basename(filename) ) 
+  
+  }else{
+ #    samplenames <- tibble(
+#   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
+ #  base_name_sample =  basename(filename) ) 
+    
+  samplenames <- tibble(
+  filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
+   base_name_sample =  basename(filename) ) 
+    
+  }
+  
+  
+  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
+ 
+ 
+  names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))] <- samplenames$sample
+ 
+  diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
+  "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
+ 
+
+```
+
+## Filtering steps
+
+```{r preparation }
+#log_info('{colnames(dfMsqrob)}')
+ pe <- readQFeatures( dfMsqrob,
+                     fnames = "Precursor.Id",
+                     ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
+                     name = "precursor")
+
+
+## really important arrange w.r.t to the samplesnames$sample to preserve the right order
+
+design <- design %>%  arrange(factor(sample, levels = samplenames$sample))
+
+colData(pe)$Group <- factor(design$group)
+colData(pe)$SampleName <- design$sample
+
+#group column from design is now Group in coData(pe)
+
+colData(pe)$Replicate <- factor(design$replicate)
+
+
+custom_col <- setdiff(colnames(design),min_col_need_design )
+
+#log_formatter(formatter_pander)
+#log_info(pe)
+
+if (length(custom_col) >= 1){
+    for (col_add in custom_col){
+       
+      if  (is.character(design[[col_add]])) {
+        log_info(paste('Chr ', col_add))
+          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
+      }else{  
+        log_info(paste('Num ', col_add))
+  	     colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
+      }
+      
+      }
+}
+
+  check_confounder_PCA<-checkConfounder(confounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
+if (check_confounder_PCA$status == 1){
+    stop(check_confounder_PCA$error)
+}
+
+
+#log_info('{ dim(colData(pe)[2] }')
+rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
+  assay %>%
+  is.na %>%
+  not %>%
+  rowSums
+
+rowData(pe[["precursor"]])$pep_per_prot <-
+  left_join(rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
+            rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
+              summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
+
+## add statistics per group 
+group_val <- design %>% distinct(group) %>%  pull()
+ group_size <- design  %>% group_by(group) %>% summarise(n_=n()) %>% pull(n_)
+names(group_size) <- group_val
+
+for ( v in group_val){
+    val = paste0('Zero',v)
+    log_info(val)
+    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    ## 
+    val_due = paste0('perc',v)
+    rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
+}
+
+orig_nFeat <- dim(pe[['precursor']])[1]
+```
+
+The filtering steps applied are:
+
+-   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values   **`r  if (params$filtPerGroup) 'per group' else 'among all the groups'`**
+
+-   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
+-   `r if (params$filtering_contaminats) 'Contaminants proteins are filtered ' else 'Contaminants proteins are not filtered'`
+
+
+
+
+```{r pre_processing}
+
+size <- dim(colData(pe))[1]
+
+## filtering per group
+
+
+
+ pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+
+  if (params$filtPerGroup) {
+      log_info('filtering per group')
+    
+      for ( v in group_val){
+          val = paste0('perc',v)
+          log_info(val)
+           #pe <- filterFeatures(pe, ~  as.f1- val <  params$nNonZero )
+           pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
+          
+      }
+
+   }else{
+        log_info('filtering across all samples')
+       pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+
+  }  
+ 
+
+# Proteotypic features
+
+if (params$Proteotypic){
+  pe <- filterFeatures(pe, ~ Proteotypic == 1)
+
+}
+
+## filtering out contaminats
+
+if (params$filtering_contaminats){
+  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
+
+}
+
+# At least 2 peptides per protein across all groups
+#pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
+
+
+
+pe <- aggregateFeatures(pe, i = "precursor",
+                           fcol = "Stripped.Sequence",
+                           name = "PeptideRawSum",
+                           fun = base::colSums,
+                           # slower but better than medianPolish
+                           na.rm = TRUE)
+
+
+pe <- logTransform(pe, base = 2, i = "PeptideRawSum",
+                   name = "peptideLog")
+
+pe <- normalize(pe,  method = params$normalization, i = "peptideLog",
+                name = "peptideNorm")
+
+pe <- infIsNA(pe, i='peptideNorm')
+
+
+
+
+ 
+for ( v in group_val){
+    val = paste0('Zero',v)
+    log_info(val)
+    rowData(pe[["peptideNorm"]])[[val]] <- assay(pe[["peptideNorm"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    ## 
+    val_due = paste0('perc',v)
+    rowData(pe[["peptideNorm"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["peptideNorm"]])[[val]] ) / group_size[[v]]) *  100
+}
+
+
+
+```
+The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['peptideNorm']])[1]`** features are retained.
+
+```{r adding_ensembl_annotation}
+if ( ! params$ensembl_annotation == ''){
+  ## read it 
+  ensembl_db_table <- read.csv(params$ensembl_annotation)
+  ## make it simple 
+  
+  ensembl_db_table <- ensembl_db_table %>%  distinct(ensembl_gene_id , .keep_all=TRUE)  %>% 
+      dplyr::select( params$ensembl_col    ) %>% distinct( hgnc_symbol, .keep_all=TRUE)
+  app <- as.data.frame(rowData(pe[['proteinRS']]))  %>%  left_join( ensembl_db_table , join_by(Genes ==  hgnc_symbol)) 
+  
+  for (i in  1:(length( params$ensembl_col) -1) ){
+     ann_col <- params$ensembl_col[i]
+     
+     rowData(pe[['proteinRS']])[[ann_col]] <- app[[ann_col]]
+  }
+ 
+
+}
+
+```
+
+## Confounder Analysis
+```{r confounder_value_analysis}
+# saveRDS(pe, file="C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe-obj.rds")
+cData<-as.data.frame(colData(pe))
+list_numeric <- list()
+list_character <- list()
+
+if (all(params$confounder_list != '')) {
+  for  (col in params$confounder_list){
+     if  (is.factor (cData[[col]])) {
+       log_info(paste0('Character - ', col))
+       list_character <- append(list_character, col)
+        
+     }else {
+       log_info(paste0('Numeric - ', col))
+       list_numeric <- append(list_numeric, col)
+     }  
+  }
+  
+  cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
+
+		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  print(boxplot_num)
+               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_numerical_conf.pdf')),paper="a4")
+               boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
+  print(boxplot_num)
+      invisible(dev.off())
+      
+  
+  for (col_ch in unlist(list_character)){
+    log_info(col_ch)
+    boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    print(boxplot_ch)
+          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_character_conf.pdf')),paper="a4")
+         boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    print(boxplot_ch)  
+     
+      invisible(dev.off())
+  }
+
+}
+
+
+```
+
+
+## Normalization
+
+Normalization of the precursor intensities are:
+
+-   Precursor  with the same peptide sequences are **summed** toghether at peptide level  
+-   Peptide intensities are log transformed and then normalized using **`r params$normalization`** approach.
+
+After all the step, the quantitaive features used in the downstream analysis are:
+
+- Number of peptide identified/quantified is : **`{r} dim(assay(pe[['peptideNorm']]))[1]`**
+
+
+```{r normalization_plot}
+par(mfrow=c(1,3))
+limma::plotDensities(assay(pe[["precursor"]]),legend=FALSE,main='Raw precursor')
+limma::plotDensities(assay(pe[["peptideLog"]]),legend=FALSE,main='Peptide log-tranformed') 
+limma::plotDensities(assay(pe[["peptideNorm"]]),legend=FALSE,main='Peptide Normalized' )
+
+#saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
+```
+
+
+## Data Missing Analysis
+
+The plot shows the completeness of the experiments at precursor and summarized level. On the the x-axis peptides/proteins are ordered based on the increasing NA content.
+
+```{r missing_val_analysis}
+peptidemissingness <- MSnbase::plotNA(assay(pe[["peptideNorm"]])) +
+  xlab("Precursor index (ordered by data completeness)") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(strip.text.x = element_blank(),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.position=c(.35,.15)
+  ) +   ggtitle("Missingness - peptide level" )
+
+
+
+#missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
+#print(missingness)
+
+```
+
+
+
+## PCA
+
+```{r pca_plot}
+
+# to do make in for loop for a set of variable
+log_info(params$folder_prj)
+var_topca <- params$PCA_comparison
+
+if (length(str_which(var_topca, "-"))== 0){
+   prcompPe<-pe[["peptideNorm"]] %>%
+        filterNA() %>%
+        assay() %>%
+        t() %>%
+        prcomp()
+  
+  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=var_topca)
+		
+   plot(pca_)
+ } else {
+
+	for (v in var_topca) {
+	  log_info(v)
+	 
+	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
+	  
+	  prcompPe<-pe[["peptideNorm"]] %>%
+			filterNA() %>%
+			assay() %>%
+			t() %>%
+			prcomp()
+		
+	  first_comp <- comparisonPCA[1]
+	  second_comp <- comparisonPCA[2]
+	  log_info(first_comp)
+	  log_info(second_comp)
+	  
+	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
+	  break
+	  }else{
+	  
+		  if (is.numeric(colData(pe)[[first_comp]])){
+			num_comp<-first_comp
+			chr_comp<-second_comp
+			}else {
+			num_comp<-second_comp
+			chr_comp<-first_comp
+			}
+		  log_info(paste0("numerical ",num_comp))
+		  log_info(paste0("categorical ",chr_comp))
+		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
+				
+		 plot(pca_)
+		 
+          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
+    log_info(file.path(params$folder_prj,"Result"))
+     pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
+     plot(pca_)
+     
+      invisible(dev.off())
+		 
+		}
+	}
+}
+
+```
+
+## DE Analysis
+
+Using MSqRob2 with the following formula `r params$formula` with ridge regression disabled
+
+```{r build_model}
+
+pe <- msqrob(object = pe, i = "peptideNorm", 
+             formula = as.formula( params$formula)  ,ridge = FALSE, overwrite = TRUE)
+
+
+contrast_list <- paste0(params$comparisons, "=0")
+#print(contrast_list)
+coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+#print(coef)
+
+L <- makeContrast(contrast_list, parameterNames = coef)
+
+# L <- makeContrast(c( "ridgeGroupB - ridgeGroupA = 0"), parameterNames = c("ridgeGroupB","ridgeGroupA"))
+# rownames(L) <- paste0("ridge",rownames(L))
+
+
+getCoef(rowData(pe[['peptideNorm']])$msqrobModels[[1]])
+
+pe <- hypothesisTest(object = pe, i = "peptideNorm", contrast = L , overwrite=TRUE)
+
+saveRDS(pe, file = 'pe.Rds')
+
+test <-  lapply(params$comparisons, DEP_volcano_peptide, data= pe,  p=params )
+
+
+names(test) <- params$comparisons 
+
+
+
+
+if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
+  dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
+}
+for (a in params$comparisons){
+  dir.create(file.path(params$folder_prj,"Result","Contrast",a), recursive = TRUE)
+}
+
+
+
+```
+
+## QC plots
+
+::: panel-tabset
+```{r QC_plot}
+#| results: asis
+  for (cmp in names(test)) {
+    cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
+    render_child(data = test[[cmp]],
+                 pe = pe ,
+                 label = cmp,
+                 path=file.path(params$folder_prj, "Result","Contrast",cmp), 
+                 template='_templatePval_distribution.Rmd') 
+    cat('\n\n')
+    
+  }
+
+```
+:::
+
+## Group Comparison
+
+::: panel-tabset
+```{r comparison}
+#| results: asis
+
+  for (cmp in names(test)) {
+    cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(cmp_label,sep=' '), '\n\n')
+    cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
+    
+    log_info('Volcano')
+    render_child(data = test[[cmp]],
+                 pe =pe,
+                 label = cmp,
+                 path=file.path(params$folder_prj, "Result","Contrast",cmp),  
+                 template='_templateContrast_Peptide.Rmd') 
+    cat('\n\n')
+    
+    filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
+    #print(filt_val) 
+    
+    if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
+      cat(' Not Significant proteins to be visualized in in the  heatmap \n')
+    }else{
+    log_info('Heatmap')
+      render_child(data = test[[cmp]], pe = pe
+                 ,sample_rel = filt_val,
+                 label = cmp, 
+                 path= file.path(  params$folder_prj, "Result","Contrast",cmp),
+                 template='_templateHeatmap_Peptide.Rmd')
+    }
+    cat('\n\n')
+    cat('\n\n')
+    cat('\n\n')
+    cat('These bar plots summarizes the number of significantly upregulated/downregulated number of peptide based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
+    log_info('barPlot')
+    render_child(data = test[[cmp]],
+                 pe =pe,
+                 label = cmp,
+                 path= file.path( params$folder_prj, "Result","Contrast",cmp),
+                 template='_templateBarPlot.Rmd')
+    cat('\n\n')
+    
+    
+  }
+
+```
+:::
+
+## Summary of the DE proteins
+
+In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
+
+```{r upset plot}
+listInput <- list()
+df_summary = as.data.frame(matrix(ncol=3, nrow=0))
+i <- 1 
+for (cmp in names(test)){
+  cmp_label <- gsub(params$contrast,'',cmp )
+  total =  dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') )[1]
+  up  = dim(test[[cmp]]$toptable %>% filter(differential_expressed =='UP') )[1]
+  down  =   dim(test[[cmp]]$toptable %>% filter(differential_expressed =='DOWN') )[1]
+  log_info(cmp)
+  log_info(total)
+  #df_summary[[cmp_label]]  <- c(total, up,down)
+  df_summary[i,1]  <- total
+  df_summary[i,2]  <- up
+  df_summary[i,3]  <- down
+
+  if (total >  0){
+    listInput[[cmp_label]] <- test[[cmp]]$toptable %>% filter(differential_expressed =='UP' |  differential_expressed =='DOWN') %>% pull(Protein.Names)
+  }
+  i <- i+1
+}
+rownames(df_summary) <- names(test) 
+colnames(df_summary) <- c('Total DE','Up DE','Down DE')
+    #log_info(df_summary)
+    ## visual table summary
+    DT::datatable( df_summary  ,
+             extensions = c('FixedColumns', 'Scroller'),
+             options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
+                            scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
+             ),
+     ) %>% formatStyle(
+   columns= c('Total DE','Up DE','Down DE'),
+   textAlign = 'center')
+    
+    # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
+    log_info({length(listInput)})
+ if (length(listInput)>=2 ) {
+    print (upset(fromList(listInput), order.by = "freq"))
+     
+      pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
+       
+     print( upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")) 
+     
+      invisible(dev.off())
+      
+      
+ 
+}
+    
+    #upset(fromList(listInput), order.by = "freq")
+     
+# pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
+# 
+# upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
+# invisible(dev.off())
+    
+```
+
+## Session Info
+
+```{r session_info }
+sessionInfo()
+```

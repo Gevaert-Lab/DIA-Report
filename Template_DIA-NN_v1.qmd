@@ -1,5 +1,5 @@
 ---
-title: "Proteomics Report: `r params$title`"
+title: "DE Analysis Report (Protein): `r params$title`"
 subtitle: "`r params$subtitle`"
 author: "`r params$author`"
 format: 
@@ -9,15 +9,17 @@ format:
     toc: true
     toc-title: 'DE Analysis'
     css: style.css
-title-block-banner: "#42b6ba"
+    title-block-banner: '#1b2944'
+    title-block-banner-color: '#f79646'
 
 execute: 
   echo: false
   warning: false
 embed-resources: true
 theme: 
- - cosmo
+ - brand 
  - custom.scss
+
 params:
   description: ""
   title: ""
@@ -32,7 +34,7 @@ params:
   adjpval_thr: 0.05
   Proteotypic: TRUE
   pep_per_prot: 3
-  nNonZero: 3
+  nNonZero: 30
   aggr_method: "medianPolish"
   normalization: "quantiles"
   filtering_contaminats: ""
@@ -43,6 +45,7 @@ params:
   confounder_list: ""
   PCA_comparison: "Group"
   quantitatve_features: "Precursor.Quantity"
+  filtPerGroup: TRUE
 ---
 
 <!-- <style> -->
@@ -131,12 +134,15 @@ check_dependencies(required_packages)
 # #webshot::install_phantomjs()
 ```
 
-## Experiment
+## Experiment Description 
 
 `r params$description`
 
 ```{r check_parameter}
 
+log_threshold(INFO)
+log_appender(appender_console)
+log_appender(appender_file("logfile_protein.log"), index = 2)
 formatter_data_frame <- function(df, ...) {
      pander::pander_return(df, style = 'simple')
 }
@@ -191,7 +197,7 @@ if (!dir.exists(file.path(params$folder_prj))){
 
 ## Import data
 
-Reading DIA data from **`r basename(params$input_file)`** using *Precursor.Translated* intensities from DIA-NN.
+Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitatve_features`* from DIA-NN as quantitative features.
 
 All the precursors with *Q-value \< 0.01* are used for the analysis.
 
@@ -259,8 +265,7 @@ if (check_confounder_list$status == 1){
   filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
    base_name_sample =  basename(filename) ) 
     
-    
-    }
+  }
   
   
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
@@ -333,24 +338,61 @@ rowData(pe[["precursor"]])$pep_per_prot <-
             rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
               summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
 
+## add statistics per group 
+group_val <- design %>% distinct(group) %>%  pull()
+ group_size <- design  %>% group_by(group) %>% summarise(n_=n()) %>% pull(n_)
+names(group_size) <- group_val
+
+for ( v in group_val){
+    val = paste0('Zero',v)
+    log_info(val)
+    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    ## 
+    val_due = paste0('perc',v)
+    rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
+}
+
+orig_nFeat <- dim(pe[['precursor']])[1]
 ```
 
-The pre-processing steps are:
+The filtering steps applied are:
 
--   Filtering precursor with more than **`r params$nNonZero`** samples with no missing intensities across all the samples
--   `r if (params$Proteotypic) 'Select only proteotypic peptides' else 'Select both not and proteotypic peptides'`
--   Select proteins with at least **`r params$pep_per_prot` peptides**
--   `r if (params$filtering_contaminats) 'Contaminats proteins are filtered ' else 'Contaminats proteins are not filtered'`
+-   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values   **`r  if (params$filtPerGroup) 'per group' else 'among all the groups'`**
+
+-   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
+-   Include proteins with at least **`r params$pep_per_prot` peptides**
+-   `r if (params$filtering_contaminats) 'Contaminants proteins are filtered ' else 'Contaminants proteins are not filtered'`
+
+
+
 
 ```{r pre_processing}
-
 
 size <- dim(colData(pe))[1]
 
 ## filtering per group
 
+
+
  pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
 
+  if (params$filtPerGroup) {
+      log_info('filtering per group')
+    
+      for ( v in group_val){
+          val = paste0('perc',v)
+          log_info(val)
+           #pe <- filterFeatures(pe, ~  as.f1- val <  params$nNonZero )
+           pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
+          
+      }
+
+   }else{
+        log_info('filtering across all samples')
+       pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+
+  }  
+ 
 
 # Proteotypic features
 
@@ -385,7 +427,20 @@ pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fun = aggr_method_f,
                         na.rm = TRUE)
 
+
+ 
+for ( v in group_val){
+    val = paste0('Zero',v)
+    log_info(val)
+    rowData(pe[["proteinRS"]])[[val]] <- assay(pe[["proteinRS"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    ## 
+    val_due = paste0('perc',v)
+    rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
+}
+saveRDS(pe, file = 'pe.Rds')
+
 ```
+The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
 
 ```{r adding_ensembl_annotation}
 if ( ! params$ensembl_annotation == ''){
@@ -408,7 +463,7 @@ if ( ! params$ensembl_annotation == ''){
 
 ```
 
-## Confounder Values Analysis
+## Confounder  Analysis
 ```{r confounder_value_analysis}
 # saveRDS(pe, file="C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe-obj.rds")
 cData<-as.data.frame(colData(pe))
@@ -431,7 +486,7 @@ if (all(params$confounder_list != '')) {
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
-               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_num.pdf')),paper="a4")
+               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_numerical_conf.pdf')),paper="a4")
                boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
       invisible(dev.off())
@@ -441,7 +496,7 @@ if (all(params$confounder_list != '')) {
     log_info(col_ch)
     boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
-          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch.pdf')),paper="a4")
+          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_character_conf.pdf')),paper="a4")
          boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)  
      
@@ -451,6 +506,29 @@ if (all(params$confounder_list != '')) {
 }
 
 
+```
+
+
+## Normalization
+
+Normalization of the precursor intensities are:
+
+-   Log transformed and then normalized using **`r params$normalization`** approach.
+-   Precursors/peptides are summarizated at protein levele using the **`r params$aggr_method`** approach.
+
+After all the step, the quantitaive features used in the downstream analysis are:
+
+- Number of precursor identified/quantified is : **`{r} dim(assay(pe[['precursor']]))[1]`**
+- Number of protein identified/quantified is : **`{r} dim(assay(pe[['proteinRS']]))[1]`**
+
+
+```{r normalization_plot}
+par(mfrow=c(1,3))
+limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transform')
+limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
+limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization' )
+
+#saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
 ```
 
 
@@ -482,22 +560,7 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 
 ```
 
-## Normalization
 
-Raw intensities from DIA-NN are processed as follow:
-
--   Log 2 transformation
--   Normalized across all the samples using **`r params$normalization`** method
--   Summarization at protein level using **`r params$aggr_method`** function
-
-```{r normalization_plot}
-par(mfrow=c(1,3))
-limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transform')
-limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
-limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization' )
-
-saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
-```
 
 ## PCA
 
@@ -520,7 +583,7 @@ if (length(str_which(var_topca, "-"))== 0){
  } else {
 
 	for (v in var_topca) {
-	 
+	  log_info(v)
 	 
 	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
 	  
@@ -530,8 +593,10 @@ if (length(str_which(var_topca, "-"))== 0){
 			t() %>%
 			prcomp()
 		
-	  first_comp<-comparisonPCA[1]
-	  second_comp<-comparisonPCA[2]
+	  first_comp <- comparisonPCA[1]
+	  second_comp <- comparisonPCA[2]
+	  log_info(first_comp)
+	  log_info(second_comp)
 	  
 	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
 	  break
@@ -550,10 +615,10 @@ if (length(str_which(var_topca, "-"))== 0){
 				
 		 plot(pca_)
 		 
-		          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
-		    log_info(file.path(params$folder_prj,"Result"))
-		           pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
-		           plot(pca_)
+          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
+    log_info(file.path(params$folder_prj,"Result"))
+     pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
+     plot(pca_)
      
       invisible(dev.off())
 		 
@@ -618,7 +683,10 @@ for (a in params$comparisons){
     cmp_label <- gsub(params$contrast,'',cmp )
     cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
     
-    render_child(data = test[[cmp]], path=file.path(params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
+    render_child(data = test[[cmp]], 
+                 pe =pe , 
+                 label= cmp ,
+                 path=file.path(params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
@@ -638,7 +706,11 @@ for (a in params$comparisons){
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
     log_info('Volcano')
-    render_child(data = test[[cmp]],path=file.path( params$folder_prj, "Result","Contrast",cmp),  template='_templateContrast.Rmd') 
+    render_child(data = test[[cmp]],
+                 pe =pe,
+                 label = cmp , 
+                 path=file.path(params$folder_prj, "Result","Contrast",cmp),  
+                 template='_templateContrast.Rmd') 
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
@@ -648,8 +720,10 @@ for (a in params$comparisons){
       cat(' Not Significant proteins  to be visualized in in the  heatmap \n')
     }else{
     log_info('Heatmap')
-      render_child(data = test[[cmp]], pe = pe
-                 ,sample_rel = filt_val,
+      render_child(data = test[[cmp]], 
+                   pe = pe,
+                   sample_rel = filt_val,
+                 label = cmp, 
                  path= file.path(  params$folder_prj, "Result","Contrast",cmp),
                  template='_templateHeatmap.Rmd')
     }
@@ -657,8 +731,10 @@ for (a in params$comparisons){
     cat('\n\n')
     cat('\n\n')
     cat('These bar plots summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
-    log_info('renderChild')
+    log_info('barPlot')
     render_child(data = test[[cmp]],
+                 pe =pe,
+                 label = cmp,
                  path= file.path( params$folder_prj, "Result","Contrast",cmp),
                  template='_templateBarPlot.Rmd')
     cat('\n\n')
@@ -703,7 +779,9 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
              options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
                             scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
              ),
-     )
+     ) %>% formatStyle(
+   columns= c('Total DE','Up DE','Down DE'),
+   textAlign = 'center')
     # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
     log_info({length(listInput)})
  if (length(listInput)>=2 ) {
