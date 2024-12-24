@@ -107,7 +107,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply')
 #print(required_packages)
 check_dependencies(required_packages)
 # 
@@ -191,7 +191,8 @@ if (!dir.exists(file.path(params$folder_prj))){
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
  min_col_need_design <- c("sample","run", "group", "replicate","filename")
-
+##  ggplot main setting
+ theme_set(theme_gray(base_size = 18))
 
 ```
 
@@ -202,6 +203,9 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 All the precursors with *Q-value \< 0.01* are used for the analysis.
 
 ```{r import data}
+
+
+  #theme_set(theme_gray(base_size = 18))
   # 'peptidesRCB.txt'  
 
   data <- read.csv(params$input_file,sep='\t')
@@ -395,7 +399,7 @@ size <- dim(colData(pe))[1]
  
 
 # Proteotypic features
-
+log_info('Proteotypic filtering')
 if (params$Proteotypic){
   pe <- filterFeatures(pe, ~ Proteotypic == 1)
 
@@ -409,17 +413,23 @@ if (params$filtering_contaminats){
 }
 
 # At least 2 peptides per protein across all groups
+log_info('PEptide per proteins filt')
+
 pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 
 
 
+log_info('log')
 
 pe <- logTransform(pe, base = 2, i = "precursor",
                    name = "precursorLog")
+log_info('normalization')
 
-pe <- normalize(pe,  method = params$normalization, i = "precursorLog",
+
+pe <- QFeatures::normalize(pe,  method = params$normalization, i = "precursorLog",
                 name = "precursorNorm")
 #MsCoreUtils::medianPolish()
+log_info('Aggregation')
 
 pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fcol = "Protein.Ids",
@@ -428,7 +438,7 @@ pe <- aggregateFeatures(pe, i = "precursorNorm",
                         na.rm = TRUE)
 
 
- 
+ log_info('Protein level % not missing')
 for ( v in group_val){
     val = paste0('Zero',v)
     log_info(val)
@@ -580,6 +590,12 @@ if (length(str_which(var_topca, "-"))== 0){
   pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=var_topca)
 		
    plot(pca_)
+   
+   pdf(file= file.path(params$folder_prj,"Result",paste0("PCA_", var_topca, ".pdf")),paper="a4")
+     plot(pca_)
+     
+      invisible(dev.off())
+   
  } else {
 
 	for (v in var_topca) {
@@ -714,18 +730,18 @@ for (a in params$comparisons){
     cat('\n\n')
     
     filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
-    #print(filt_val) 
-    
+    #print(filt_val)
+
     if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
       cat(' Not Significant proteins  to be visualized in in the  heatmap \n')
     }else{
     log_info('Heatmap')
-      render_child(data = test[[cmp]], 
+      render_child(data = test[[cmp]],
                    pe = pe,
                    sample_rel = filt_val,
-                 label = cmp, 
+                 label = cmp,
                  path= file.path(  params$folder_prj, "Result","Contrast",cmp),
-                 template='_templateHeatmap.Rmd')
+                 template='_templateHeatMap.Rmd')
     }
     cat('\n\n')
     cat('\n\n')
@@ -744,6 +760,8 @@ for (a in params$comparisons){
 
 ```
 :::
+
+
 
 ## Summary of the DE proteins
 

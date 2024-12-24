@@ -7,6 +7,7 @@ library(quarto)
 library(here)
 library(fs)
 library(logger)
+library(yaml)
 
 
 
@@ -24,30 +25,39 @@ library(logger)
 
 
 
-report_target_folder <- 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2'
+report_target_folder <- 'C:\\Users\\Andrea\\workspace\\DIA-Report\\Test\\UPS_spike'
 
 input_report_parameter <- list(title =  "DIANN_Ecoli_spikeUPS2",
                                subtitle = 'DE Analysis', 
                                author= 'A.Argentini',
                                description= 'Yeast as background and USP2 proteins spiked in different concentration. This Experiment is designed for DIA benchmarking of different workflow using DIA-NN.',
-                               input_file= 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2\\report.tsv',
-                               design_file = 'C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\Data_Intership2024\\DIANN_Ecoli_spikeUPS2\\annotation_DIA_dummy_v2.csv',
+                               input_file= 'C:\\Users\\Andrea\\workspace\\DIA-Report\\data\\report.tsv',
+                               design_file = 'C:\\Users\\Andrea\\workspace\\DIA-Report\\data\\annotation_DIA_dummy_v2.csv',
                                folder_prj = report_target_folder ,
                                contrast= 'Group',
                                aggr_method= 'medianPolish',
-                               normalization ='quantiles',
+                               normalization ='center.median',
                                formula = '~ -1 + Group',
                                Proteotypic = TRUE,
                                pep_per_prot= 3,
                                nNonZero= 30,
-                               comparisons= c('GroupA - GroupB', 'GroupA - GroupC'),
+                               comparisons= c('GroupA - GroupB', 'GroupA - GroupC','GroupB - GroupC'),
                                quantitatve_features= 'Precursor.Translated',
-                               filtering_contaminats= FALSE 
+                               filtering_contaminats= FALSE ,
+                               filtPerGroup= FALSE
                                
 )
+
 # 'GroupA - GroupD'
+
+
+yaml_string <- as.yaml(input_report_parameter)
+
+write(yaml_string, file = "run_parameter_ups.yaml")
+
+
                                
-filename_target <- paste0( 'DIA_TEMPLATE',
+filename_target <- paste0( 'DIA_TEMPLATE_UPSspike',
                           ".html")
 # run quarto render
 quarto_render(input= 'Template_DIA-NN_v1.qmd',
@@ -57,4 +67,6 @@ quarto_render(input= 'Template_DIA-NN_v1.qmd',
 
 # moving the report from the working folder to the target folder
 fs::file_move(filename_target, report_target_folder)
-     
+fs::file_move("run_parameter_ups.yaml", report_target_folder)     
+fs::file_move("logfile_protein.log", report_target_folder)     
+
