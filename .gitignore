@@ -65,3 +65,7 @@ Demo_project/
 *.jpg
 
 *.log
+
+*.Rproj
+
+*.Rds

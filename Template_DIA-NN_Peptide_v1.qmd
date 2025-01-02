@@ -203,6 +203,9 @@ if (!dir.exists(file.path(params$folder_prj))){
  min_col_need_design <- c("sample","run", "group", "replicate","filename")
 
 
+theme_set(theme_custom_vis())
+
+ 
 ```
 
 ## Import data
@@ -369,7 +372,7 @@ The filtering steps applied are:
 -   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values   **`r  if (params$filtPerGroup) 'per group' else 'among all the groups'`**
 
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
--   `r if (params$filtering_contaminats) 'Contaminants proteins are filtered ' else 'Contaminants proteins are not filtered'`
+-   `r if (params$filtering_contaminats) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
 
 
 
@@ -585,6 +588,11 @@ if (length(str_which(var_topca, "-"))== 0){
   pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=var_topca)
 		
    plot(pca_)
+   
+    pdf(file= file.path(params$folder_prj,"Result",paste0("PCA_", var_topca, ".pdf")),paper="a4")
+     plot(pca_)
+     
+      invisible(dev.off())
  } else {
 
 	for (v in var_topca) {
@@ -658,7 +666,7 @@ getCoef(rowData(pe[['peptideNorm']])$msqrobModels[[1]])
 
 pe <- hypothesisTest(object = pe, i = "peptideNorm", contrast = L , overwrite=TRUE)
 
-saveRDS(pe, file = 'pe.Rds')
+#saveRDS(pe, file = 'pe.Rds')
 
 test <-  lapply(params$comparisons, DEP_volcano_peptide, data= pe,  p=params )
 
@@ -749,7 +757,7 @@ for (a in params$comparisons){
 ```
 :::
 
-## Summary of the DE proteins
+## Summary of the DE peptides
 
 In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
 

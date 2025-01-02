@@ -22,14 +22,18 @@ library(DT)
 perc_field <- rowData(pe[['peptideNorm']]) %>% colnames() %>%  stringr::str_subset('perc') 
 DT::datatable( data$toptable %>% arrange(adjPval)  ,
              extensions = c('FixedColumns', 'Scroller'),
-             options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
-                            scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
+             options = list(fixedColumns = TRUE, scrollY = 600, scrollX = TRUE,
+                            scroller = TRUE, dom = 'Bfrtip', autoWidth = FALSE,
+              columnDefs=list( list(width = '20px', targets = 2), list(width = '20px', targets = 1))
              ),
  ) %>% formatStyle(
    'differential_expressed',
    target = 'row',
    textAlign = 'center',
-    backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f')))%>% formatRound(columns=c('logFC'), digits=2) %>%
+    backgroundColor =  styleEqual(c('UP', 'DOWN'), c('#7fcdbb', '#fec44f'))) %>%  formatStyle(
+    'Protein.Names',
+    'text-align' = 'left'  
+  )  %>% formatRound(columns=c('logFC'), digits=2) %>%
   formatSignif(columns = c('pval', 'adjPval'), digits = 2) %>%  formatString(columns=perc_field, suffix='%')
   
 
@@ -60,12 +64,11 @@ if ( UP > 0 | DOWN > 0   ) {
    
     
     
-  ann <-  data$toptable  %>%   filter ( precursor_id  %in% final ) %>% dplyr::select(precursor_id  ,logFC,adjPval) %>%  mutate( Peptide_info=  str_wrap( paste(precursor_id,'\n','LogFC:',round(logFC,2),'adjPval',round(adjPval,2) ,sep=' '),width= 15)  ) %>% dplyr::select(  -adjPval)
+  ann <-  data$toptable  %>%   filter ( precursor_id  %in% final ) %>% dplyr::select(precursor_id  ,logFC,adjPval) %>%  mutate( Peptide_info=  str_wrap( paste(precursor_id,'\n','LogFC:',round(logFC,2),'adjPval',format(adjPval,scientific= TRUE) ,sep=' '),width= 15)  ) %>% dplyr::select(  -adjPval)
   
   log_info("{dim(ab)}")
     ab <-  ab %>% rownames_to_column('Precursor') %>% left_join(ann, join_by(Precursor  == precursor_id)) %>%  gather(Sample, Intensity ,- c(Precursor ,Peptide_info,logFC))  %>% left_join( as.data.frame(colData(pe)), join_by( Sample  == SampleName) )
     
-
    
      dep_plot_crip <- ab %>%
   ggplot( aes(x=Group, y=Intensity, fill=Group )) +
@@ -76,7 +79,12 @@ if ( UP > 0 | DOWN > 0   ) {
     facet_wrap( . ~ reorder(Peptide_info, logFC), nrow = 4  )
 #
      # . ~ Peptide_info
-  dep_plot_crip
+    print(dep_plot_crip)
+  
+      ggsave(dep_plot_crip , 
+       filename =  file.path(path,paste0('Boxplot_DE_proteins.pdf')),
+       device = "pdf",
+       height = 30, width = 25, units = "cm")
   
 }
 

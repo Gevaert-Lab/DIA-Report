@@ -322,12 +322,14 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
     DEall <- all_res[!is.na(all_res$adjPval) , c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
     
   }
-  
-  p_toFile <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
-                                          label= Genes  )  )  +
+  all_res_file <- all_res %>% mutate(label_DE= case_when(differential_expressed  == 'NO'  ~ '',
+                                                         differential_expressed == 'UP' |  differential_expressed == 'DOWN ' ~ Genes
+                                                         ))
+  p_toFile <- ggplot(data = all_res_file , aes(x = logFC, y = -log10(pval) ,col=differential_expressed 
+                                           ,label = label_DE )  )  +
     geom_point() +
     theme_minimal() +
-    geom_text_repel() +
+    geom_text_repel(aes(label = label_DE)) +
     geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
     geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
     scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
@@ -376,8 +378,9 @@ render_child <- function(data, path, pe, label , sample_rel,  template) {
 #' This function get a vector with names of packages.
 #' Check if packages are available, if not it installs them.
 #' Then, it loads the packages.
-#'
-#' @param required_packages : a vector with packages to be uploaded 
+#' @param required_packages : a vector with packages to be installed 
+#' @return none
+
 check_dependencies = function(required_packages = required_packages){
   suppressPackageStartupMessages(
     for(i in required_packages){
@@ -443,4 +446,22 @@ checkConfounder<- function (confounder, colsDesign) {
   }
 
 }
-
+###--------------theme_custom_vis ----
+#' @author Andrea Argentini
+#' theme_custom_vis is used to set the default theme 
+#' for all the ggplot plots
+#' @param base_size font size u
+#' @return none
+theme_custom_vis <- function(base_size = 12) {
+  theme_bw(base_size = base_size) %+replace% 
+    theme(
+      # leggend
+      legend.title = element_text(size = rel(0.85), face = "bold"),
+      legend.text = element_text(size = rel(0.70), face = "bold"),
+      legend.key = element_rect(fill = "transparent", colour = NA),
+      legend.key.size = unit(1.5, "lines"),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      strip.background = element_rect(fill = "#7c7c7c", color = "#7c7c7c"),
+      strip.text = element_text(size = rel(0.85), face = "bold", color = "#1b2944", margin = margin(5,0,5,0))
+    )
+}

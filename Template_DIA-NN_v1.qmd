@@ -179,7 +179,7 @@ if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median",
 
 if (params$filtering_contaminats){
    if (params$contaminats_str == ""){
-     stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminats,..)")
+     stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminants,..)")
    } 
 }
   ## to do visualize input contaminats_str(".","Result"))){
@@ -191,9 +191,14 @@ if (!dir.exists(file.path(params$folder_prj))){
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
  min_col_need_design <- c("sample","run", "group", "replicate","filename")
-##  ggplot main setting
- theme_set(theme_gray(base_size = 18))
 
+ 
+ 
+ theme_set(theme_custom_vis())
+
+ 
+ 
+ 
 ```
 
 ## Import data
@@ -365,7 +370,7 @@ The filtering steps applied are:
 
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
 -   Include proteins with at least **`r params$pep_per_prot` peptides**
--   `r if (params$filtering_contaminats) 'Contaminants proteins are filtered ' else 'Contaminants proteins are not filtered'`
+-   `r if (params$filtering_contaminats) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
 
 
 
@@ -447,7 +452,7 @@ for ( v in group_val){
     val_due = paste0('perc',v)
     rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
 }
-saveRDS(pe, file = 'pe.Rds')
+#saveRDS(pe, file = 'pe.Rds')
 
 ```
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.

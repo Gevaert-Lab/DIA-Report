@@ -55,7 +55,7 @@ if ( UP > 1 | DOWN > 1   ) {
 
    ab <- as.data.frame(assay(pe[["proteinRS"]])[final,sample_sel])
 
-   ann <-  data$toptable  %>%   filter ( Uniprot_id  %in% final ) %>% dplyr::select(Uniprot_id ,Genes ,logFC,adjPval) %>%  mutate( Protein_info=  str_wrap( paste(Genes,'\n','LogFC:',round(logFC,2),'adjPval',round(adjPval,2) ,sep=' '), width =15) ) %>% dplyr::select(- Genes, , -adjPval)
+   ann <-  data$toptable  %>%   filter ( Uniprot_id  %in% final ) %>% dplyr::select(Uniprot_id ,Genes ,logFC,adjPval) %>%  mutate( Protein_info=  str_wrap( paste(Genes,'\n','LogFC:',round(logFC,2),'adjPval',format(adjPval,scientific= TRUE) ,sep=' '), width =15) ) %>% dplyr::select(- Genes, , -adjPval)
    #%>% str_wrap(long_varname, width = var_width)
 
    ab <-  ab %>% rownames_to_column('Protein') %>% left_join(ann, join_by(Protein  == Uniprot_id)) %>%  gather(Sample, Intensity ,- c(Protein ,Protein_info,logFC))%>% left_join( as.data.frame(colData(pe)) %>% rownames_to_column('Sample'), join_by(Sample) )
@@ -68,7 +68,19 @@ if ( UP > 1 | DOWN > 1   ) {
        ylab('Summarized Protein Intensity ') +
       facet_wrap( . ~ reorder(Protein_info, logFC), nrow = 2  )
 
-  dep_plot_crip
+    print(dep_plot_crip)
+    
+    ggsave(dep_plot_crip , 
+       filename =  file.path(path,paste0('Boxplot_DE_proteins.pdf')),
+       device = "pdf",
+       height = 15, width = 25, units = "cm")
+    
+
+      # pdf(file= file.path(path,paste0('Boxplot_DE_proteins.pdf')),paper="a4")
+      # dep_plot_crip
+      # invisible(dev.off())
+
+  
   
 }
 
