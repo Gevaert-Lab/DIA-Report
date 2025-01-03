@@ -209,10 +209,7 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
 
 ```{r import data}
 
-
-  #theme_set(theme_gray(base_size = 18))
-  # 'peptidesRCB.txt'  
-
+  log_info('Reading Data...')
   data <- read.csv(params$input_file,sep='\t')
   ## deal csv  with different separated values 
   L <- readLines(params$design_file, n = 1)
@@ -257,7 +254,6 @@ if (check_confounder_list$status == 1){
     stop(check_confounder_list$error)
 }
   }
-#log_info(params$confounder_list[1]) 
 
   
   if ( .Platform$OS.type == "unix" ){
@@ -291,7 +287,9 @@ if (check_confounder_list$status == 1){
 ## Filtering steps
 
 ```{r preparation }
-#log_info('{colnames(dfMsqrob)}')
+
+  log_info('Creating Qfeature object....')
+
  pe <- readQFeatures( dfMsqrob,
                      fnames = "Precursor.Id",
                      ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
@@ -312,10 +310,10 @@ colData(pe)$Replicate <- factor(design$replicate)
 
 custom_col <- setdiff(colnames(design),min_col_need_design )
 
-#log_formatter(formatter_pander)
-#log_info(pe)
+
 
 if (length(custom_col) >= 1){
+    log_info('Importing ConFounder....')
     for (col_add in custom_col){
        
       if  (is.character(design[[col_add]])) {
@@ -334,8 +332,6 @@ if (check_confounder_PCA$status == 1){
     stop(check_confounder_PCA$error)
 }
 
-
-#log_info('{ dim(colData(pe)[2] }')
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
   assay %>%
   is.na %>%
@@ -354,7 +350,6 @@ names(group_size) <- group_val
 
 for ( v in group_val){
     val = paste0('Zero',v)
-    log_info(val)
     rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
@@ -390,9 +385,7 @@ size <- dim(colData(pe))[1]
     
       for ( v in group_val){
           val = paste0('perc',v)
-          log_info(val)
-           #pe <- filterFeatures(pe, ~  as.f1- val <  params$nNonZero )
-           pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
+          pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
           
       }
 
@@ -404,8 +397,9 @@ size <- dim(colData(pe))[1]
  
 
 # Proteotypic features
-log_info('Proteotypic filtering')
 if (params$Proteotypic){
+  log_info('Proteotypic filtering')
+
   pe <- filterFeatures(pe, ~ Proteotypic == 1)
 
 }
@@ -413,28 +407,30 @@ if (params$Proteotypic){
 ## filtering out contaminats
 
 if (params$filtering_contaminats){
+    log_info('Filtering contaminants')
+
   pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
 
 }
 
 # At least 2 peptides per protein across all groups
-log_info('PEptide per proteins filt')
+log_info('Filtering only n peptides per proteins')
 
 pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 
 
 
-log_info('log')
+log_info('Intensity log tranformation')
 
 pe <- logTransform(pe, base = 2, i = "precursor",
                    name = "precursorLog")
-log_info('normalization')
+log_info('Normalization')
 
 
 pe <- QFeatures::normalize(pe,  method = params$normalization, i = "precursorLog",
                 name = "precursorNorm")
 #MsCoreUtils::medianPolish()
-log_info('Aggregation')
+log_info('Summarization at protein level')
 
 pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fcol = "Protein.Ids",
@@ -442,8 +438,7 @@ pe <- aggregateFeatures(pe, i = "precursorNorm",
                         fun = aggr_method_f,
                         na.rm = TRUE)
 
-
- log_info('Protein level % not missing')
+log_info('Computing protein level % not missing')
 for ( v in group_val){
     val = paste0('Zero',v)
     log_info(val)
@@ -452,7 +447,6 @@ for ( v in group_val){
     val_due = paste0('perc',v)
     rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
 }
-#saveRDS(pe, file = 'pe.Rds')
 
 ```
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
@@ -478,9 +472,9 @@ if ( ! params$ensembl_annotation == ''){
 
 ```
 
-## Confounder  Analysis
+## Confounder Analysis
 ```{r confounder_value_analysis}
-# saveRDS(pe, file="C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe-obj.rds")
+log_info('Confounder Analysis')
 cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
@@ -488,11 +482,11 @@ list_character <- list()
 if (all(params$confounder_list != '')) {
   for  (col in params$confounder_list){
      if  (is.factor (cData[[col]])) {
-       log_info(paste0('Character - ', col))
+       #log_info(paste0('Character - ', col))
        list_character <- append(list_character, col)
         
      }else {
-       log_info(paste0('Numeric - ', col))
+       #log_info(paste0('Numeric - ', col))
        list_numeric <- append(list_numeric, col)
      }  
   }
@@ -501,17 +495,17 @@ if (all(params$confounder_list != '')) {
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
-               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_numerical_conf.pdf')),paper="a4")
+               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_num_confounder.pdf')),paper="a4")
                boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
       invisible(dev.off())
       
   
   for (col_ch in unlist(list_character)){
-    log_info(col_ch)
+    #log_info(col_ch)
     boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
-          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_character_conf.pdf')),paper="a4")
+          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch_confounder.pdf')),paper="a4")
          boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)  
      
@@ -543,7 +537,6 @@ limma::plotDensities(assay(pe[["precursorLog"]]),legend=FALSE,main='Log-Transfor
 limma::plotDensities(assay(pe[["precursorNorm"]]),legend=FALSE,main='Normalized') 
 limma::plotDensities(assay(pe[["proteinRS"]]),legend=FALSE,main='Protein Summarization' )
 
-#saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
 ```
 
 
@@ -582,7 +575,7 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 ```{r pca_plot}
 
 # to do make in for loop for a set of variable
-log_info(params$folder_prj)
+log_info('PCA Analysis...')
 var_topca <- params$PCA_comparison
 
 if (length(str_which(var_topca, "-"))== 0){
@@ -604,7 +597,7 @@ if (length(str_which(var_topca, "-"))== 0){
  } else {
 
 	for (v in var_topca) {
-	  log_info(v)
+	  #log_info(v)
 	 
 	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
 	  
@@ -616,8 +609,8 @@ if (length(str_which(var_topca, "-"))== 0){
 		
 	  first_comp <- comparisonPCA[1]
 	  second_comp <- comparisonPCA[2]
-	  log_info(first_comp)
-	  log_info(second_comp)
+	  #log_info(first_comp)
+	  #log_info(second_comp)
 	  
 	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
 	  break
@@ -630,14 +623,13 @@ if (length(str_which(var_topca, "-"))== 0){
 			num_comp<-second_comp
 			chr_comp<-first_comp
 			}
-		  log_info(paste0("numerical ",num_comp))
-		  log_info(paste0("categorical ",chr_comp))
+		  #log_info(paste0("numerical ",num_comp))
+		  #log_info(paste0("categorical ",chr_comp))
 		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
 				
 		 plot(pca_)
 		 
-          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
-    log_info(file.path(params$folder_prj,"Result"))
+    
      pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
      plot(pca_)
      
@@ -654,15 +646,13 @@ if (length(str_which(var_topca, "-"))== 0){
 Using MSqRob2 with the following formula `r params$formula` with ridge regression disabled
 
 ```{r build_model}
-
+log_info('DE Analysis with Msqrob..')
 pe <- msqrob(object = pe, i = "proteinRS", 
              formula = as.formula( params$formula)  ,ridge = FALSE, overwrite = TRUE)
 
 
 contrast_list <- paste0(params$comparisons, "=0")
-#print(contrast_list)
 coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
-#print(coef)
 
 L <- makeContrast(contrast_list, parameterNames = coef)
 
@@ -681,7 +671,8 @@ test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 
 names(test) <- params$comparisons 
 
-
+log_info('Saving pe object (qfeatures) as Rds file.')
+saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experimens.Rds"))
 
 
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
@@ -721,12 +712,16 @@ for (a in params$comparisons){
 ```{r comparison}
 #| results: asis
 
+log_info('Running Analysis for each comparison..')
+
   for (cmp in names(test)) {
+        log_info( paste0('  --  ',cmp)) 
+
     cmp_label <- gsub(params$contrast,'',cmp )
     cat( '## ', paste(cmp_label,sep=' '), '\n\n')
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
-    log_info('Volcano')
+    
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp , 
@@ -740,7 +735,7 @@ for (a in params$comparisons){
     if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
       cat(' Not Significant proteins  to be visualized in in the  heatmap \n')
     }else{
-    log_info('Heatmap')
+    
       render_child(data = test[[cmp]],
                    pe = pe,
                    sample_rel = filt_val,
@@ -752,7 +747,7 @@ for (a in params$comparisons){
     cat('\n\n')
     cat('\n\n')
     cat('These bar plots summarizes the number of significantly upregulated/downregulated number of proteins based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
-    log_info('barPlot')
+   
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp,
@@ -773,6 +768,7 @@ for (a in params$comparisons){
 In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
 
 ```{r upset plot}
+log_info('DE Summaries computation...')
 listInput <- list()
 df_summary = as.data.frame(matrix(ncol=3, nrow=0))
 i <- 1 
@@ -795,7 +791,6 @@ for (cmp in names(test)){
 }
 rownames(df_summary) <- names(test) 
 colnames(df_summary) <- c('Total DE','Up DE','Down DE')
-    #log_info(df_summary)
     ## visual table summary
     DT::datatable( df_summary  ,
              extensions = c('FixedColumns', 'Scroller'),
@@ -806,7 +801,7 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
    columns= c('Total DE','Up DE','Down DE'),
    textAlign = 'center')
     # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
-    log_info({length(listInput)})
+    #log_info({length(listInput)})
  if (length(listInput)>=2 ) {
     print (upset(fromList(listInput), order.by = "freq"))
      
@@ -820,13 +815,7 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
  
 }
     
-    #upset(fromList(listInput), order.by = "freq")
-     
-# pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
-# 
-# upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")
-# invisible(dev.off())
-    
+
 ```
 
 ## Session Info

@@ -3,7 +3,7 @@
 ```{r}
 library(reshape2)
 
-log_info("inside BArPlot")
+log_info("Inside BArPlot...")
 label_work <- gsub('Group','',label)
   label_work_f <- gsub(' ','_',label_work)
 DE <- data$toptable

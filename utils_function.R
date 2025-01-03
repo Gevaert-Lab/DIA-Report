@@ -243,10 +243,13 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
     DEall <- all_res[!is.na(all_res$adjPval) , c('Uniprot_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
   }
   ## volcano annotate with gene name 
-  p_toFile <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
-                                          label= Genes  )  )  +
+  
+  all_res_file <- all_res  %>% mutate( label_DE = case_when( differential_expressed == 'UP' ~ Genes, 
+                                  differential_expressed == 'DOWN' ~ Genes , 
+                                  TRUE  ~ NA  )) 
+  p_toFile <- ggplot(data = all_res_file , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+                                          label= label_DE  )  )  +
     geom_point() +
-    theme_minimal() +
     geom_text_repel() +
     geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
     geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
@@ -322,14 +325,17 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
     DEall <- all_res[!is.na(all_res$adjPval) , c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
     
   }
-  all_res_file <- all_res %>% mutate(label_DE= case_when(differential_expressed  == 'NO'  ~ '',
-                                                         differential_expressed == 'UP' |  differential_expressed == 'DOWN ' ~ Genes
-                                                         ))
+  all_res_file <- all_res %>%  mutate( Gene_v =  case_when( str_detect(Genes, ";") ~ str_split(Genes, ";", simplify = TRUE)[, 1],
+                                                        TRUE ~ Genes)) %>%  
+    mutate( label_DE = case_when( differential_expressed == 'UP' ~ paste(Gene_v,precursor_id,sep='_'), 
+                           differential_expressed == 'DOWN' ~  paste(Gene_v,precursor_id,sep='_') , 
+                           TRUE  ~ NA  )) 
+    
+    
   p_toFile <- ggplot(data = all_res_file , aes(x = logFC, y = -log10(pval) ,col=differential_expressed 
                                            ,label = label_DE )  )  +
     geom_point() +
-    theme_minimal() +
-    geom_text_repel(aes(label = label_DE)) +
+    geom_text_repel() +
     geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
     geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
     scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+

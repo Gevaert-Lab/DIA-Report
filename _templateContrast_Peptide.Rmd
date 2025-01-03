@@ -1,6 +1,8 @@
 
 ```{r peptide_contras}
 
+log_info('Inside Contrast Visual for Peptide.... ')
+
 label_work <- gsub('Group','',label)
   label_work_f <- gsub(' ','_',label_work)
 
@@ -10,9 +12,9 @@ ggplotly(data$volcano)
 
 #pdf(file= file.path(path,paste0("Volcano",".pdf")), width=10, height=10, res=200, units="in")
 
-pdf(file= file.path(path,paste0("Volcano",".pdf")), paper='A4')
+pdf(file= file.path(path,paste0("Volcano",".pdf")), height = 15, width = 20)
 
-data$volcano2file
+print(data$volcano2file)
 
 invisible(dev.off())
 
@@ -45,15 +47,15 @@ UP <- dim(data$toptable %>% filter(differential_expressed == 'UP'))[1]
 DOWN <-  dim(data$toptable %>% filter(differential_expressed == 'DOWN'))[1]
  
 if ( UP > 0 | DOWN > 0   ) { 
-  log_info('Ho DE peptide')
- cat('Boxplot intensities of the top 10 DE peptides ordered by log2FC')
+  log_info('DE peptides found')
+  cat('Boxplot intensities of the top 10 DE peptides ordered by log2FC')
     ## peptide
     d_l <- data$toptable %>% filter(differential_expressed == 'DOWN') %>% arrange(logFC) %>% head(10)%>%   pull(precursor_id)
     u_l <- data$toptable %>% filter(differential_expressed == 'UP') %>% arrange(logFC) %>% head(10) %>%  pull(precursor_id)
 
      
    final <- c(d_l,u_l)
-   
+   ## logging info to print list 
    #log_info("{paste(final, collapse = ', ')}")
             
    sample_sel <- c(rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[1],] ),
@@ -66,7 +68,7 @@ if ( UP > 0 | DOWN > 0   ) {
     
   ann <-  data$toptable  %>%   filter ( precursor_id  %in% final ) %>% dplyr::select(precursor_id  ,logFC,adjPval) %>%  mutate( Peptide_info=  str_wrap( paste(precursor_id,'\n','LogFC:',round(logFC,2),'adjPval',format(adjPval,scientific= TRUE) ,sep=' '),width= 15)  ) %>% dplyr::select(  -adjPval)
   
-  log_info("{dim(ab)}")
+  
     ab <-  ab %>% rownames_to_column('Precursor') %>% left_join(ann, join_by(Precursor  == precursor_id)) %>%  gather(Sample, Intensity ,- c(Precursor ,Peptide_info,logFC))  %>% left_join( as.data.frame(colData(pe)), join_by( Sample  == SampleName) )
     
    
@@ -77,8 +79,7 @@ if ( UP > 0 | DOWN > 0   ) {
     geom_jitter(color="black", size=1, alpha=0.8)  +
      ylab('Peptide Intensity') +
     facet_wrap( . ~ reorder(Peptide_info, logFC), nrow = 4  )
-#
-     # . ~ Peptide_info
+
     print(dep_plot_crip)
   
       ggsave(dep_plot_crip , 

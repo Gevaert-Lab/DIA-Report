@@ -215,7 +215,7 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
 
 ```{r import data}
   # 'peptidesRCB.txt'  
-
+  log_info('Reading Data...')
   data <- read.csv(params$input_file,sep='\t')
   ## deal csv  with different separated values 
   L <- readLines(params$design_file, n = 1)
@@ -260,7 +260,6 @@ if (check_confounder_list$status == 1){
     stop(check_confounder_list$error)
 }
   }
-#log_info(params$confounder_list[1]) 
 
   
   if ( .Platform$OS.type == "unix" ){
@@ -294,7 +293,9 @@ if (check_confounder_list$status == 1){
 ## Filtering steps
 
 ```{r preparation }
-#log_info('{colnames(dfMsqrob)}')
+
+  log_info('Creating Qfeature object....')
+
  pe <- readQFeatures( dfMsqrob,
                      fnames = "Precursor.Id",
                      ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
@@ -315,10 +316,11 @@ colData(pe)$Replicate <- factor(design$replicate)
 
 custom_col <- setdiff(colnames(design),min_col_need_design )
 
-#log_formatter(formatter_pander)
-#log_info(pe)
+
 
 if (length(custom_col) >= 1){
+      log_info('Importing ConFounder....')
+
     for (col_add in custom_col){
        
       if  (is.character(design[[col_add]])) {
@@ -338,7 +340,6 @@ if (check_confounder_PCA$status == 1){
 }
 
 
-#log_info('{ dim(colData(pe)[2] }')
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
   assay %>%
   is.na %>%
@@ -357,7 +358,6 @@ names(group_size) <- group_val
 
 for ( v in group_val){
     val = paste0('Zero',v)
-    log_info(val)
     rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
@@ -392,8 +392,6 @@ size <- dim(colData(pe))[1]
     
       for ( v in group_val){
           val = paste0('perc',v)
-          log_info(val)
-           #pe <- filterFeatures(pe, ~  as.f1- val <  params$nNonZero )
            pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
           
       }
@@ -408,6 +406,8 @@ size <- dim(colData(pe))[1]
 # Proteotypic features
 
 if (params$Proteotypic){
+  log_info('Proteotypic filtering')
+
   pe <- filterFeatures(pe, ~ Proteotypic == 1)
 
 }
@@ -415,12 +415,11 @@ if (params$Proteotypic){
 ## filtering out contaminats
 
 if (params$filtering_contaminats){
+      log_info('Filtering contaminants')
+
   pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
 
 }
-
-# At least 2 peptides per protein across all groups
-#pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 
 
 
@@ -431,10 +430,11 @@ pe <- aggregateFeatures(pe, i = "precursor",
                            # slower but better than medianPolish
                            na.rm = TRUE)
 
+log_info('Intensity log tranformation')
 
 pe <- logTransform(pe, base = 2, i = "PeptideRawSum",
                    name = "peptideLog")
-
+log_info('Normalization')
 pe <- normalize(pe,  method = params$normalization, i = "peptideLog",
                 name = "peptideNorm")
 
@@ -443,10 +443,10 @@ pe <- infIsNA(pe, i='peptideNorm')
 
 
 
- 
+ log_info('Computing peptide level % not missing')
+
 for ( v in group_val){
     val = paste0('Zero',v)
-    log_info(val)
     rowData(pe[["peptideNorm"]])[[val]] <- assay(pe[["peptideNorm"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
@@ -481,7 +481,8 @@ if ( ! params$ensembl_annotation == ''){
 
 ## Confounder Analysis
 ```{r confounder_value_analysis}
-# saveRDS(pe, file="C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe-obj.rds")
+log_info('Confounder Analysis')
+
 cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
@@ -489,11 +490,11 @@ list_character <- list()
 if (all(params$confounder_list != '')) {
   for  (col in params$confounder_list){
      if  (is.factor (cData[[col]])) {
-       log_info(paste0('Character - ', col))
+       #log_info(paste0('Character - ', col))
        list_character <- append(list_character, col)
         
      }else {
-       log_info(paste0('Numeric - ', col))
+       #log_info(paste0('Numeric - ', col))
        list_numeric <- append(list_numeric, col)
      }  
   }
@@ -502,17 +503,17 @@ if (all(params$confounder_list != '')) {
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
-               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_numerical_conf.pdf')),paper="a4")
+               pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_num_confounder.pdf')),paper="a4")
                boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
       invisible(dev.off())
       
   
   for (col_ch in unlist(list_character)){
-    log_info(col_ch)
+    #log_info(col_ch)
     boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
-          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_character_conf.pdf')),paper="a4")
+          pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch_confounder.pdf')),paper="a4")
          boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)  
      
@@ -575,7 +576,7 @@ peptidemissingness <- MSnbase::plotNA(assay(pe[["peptideNorm"]])) +
 ```{r pca_plot}
 
 # to do make in for loop for a set of variable
-log_info(params$folder_prj)
+log_info('PCA Analysis...')
 var_topca <- params$PCA_comparison
 
 if (length(str_which(var_topca, "-"))== 0){
@@ -596,7 +597,7 @@ if (length(str_which(var_topca, "-"))== 0){
  } else {
 
 	for (v in var_topca) {
-	  log_info(v)
+	  #log_info(v)
 	 
 	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
 	  
@@ -608,8 +609,8 @@ if (length(str_which(var_topca, "-"))== 0){
 		
 	  first_comp <- comparisonPCA[1]
 	  second_comp <- comparisonPCA[2]
-	  log_info(first_comp)
-	  log_info(second_comp)
+	  #log_info(first_comp)
+	  #log_info(second_comp)
 	  
 	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
 	  break
@@ -622,14 +623,12 @@ if (length(str_which(var_topca, "-"))== 0){
 			num_comp<-second_comp
 			chr_comp<-first_comp
 			}
-		  log_info(paste0("numerical ",num_comp))
-		  log_info(paste0("categorical ",chr_comp))
+		  #log_info(paste0("numerical ",num_comp))
+		  #log_info(paste0("categorical ",chr_comp))
 		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
 				
 		 plot(pca_)
 		 
-          # pdf(file= paste0(file.path(params$folder_prj,"Result"),"PCA by ", v, ".pdf"),paper="a4")
-    log_info(file.path(params$folder_prj,"Result"))
      pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
      plot(pca_)
      
@@ -646,15 +645,14 @@ if (length(str_which(var_topca, "-"))== 0){
 Using MSqRob2 with the following formula `r params$formula` with ridge regression disabled
 
 ```{r build_model}
+log_info('DE Analysis with Msqrob..')
 
 pe <- msqrob(object = pe, i = "peptideNorm", 
              formula = as.formula( params$formula)  ,ridge = FALSE, overwrite = TRUE)
 
 
 contrast_list <- paste0(params$comparisons, "=0")
-#print(contrast_list)
 coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
-#print(coef)
 
 L <- makeContrast(contrast_list, parameterNames = coef)
 
@@ -665,8 +663,9 @@ L <- makeContrast(contrast_list, parameterNames = coef)
 getCoef(rowData(pe[['peptideNorm']])$msqrobModels[[1]])
 
 pe <- hypothesisTest(object = pe, i = "peptideNorm", contrast = L , overwrite=TRUE)
-
-#saveRDS(pe, file = 'pe.Rds')
+# save PE obj  
+log_info('Saving pe object (qfeatures) as Rds file.')
+saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experimens.Rds"))
 
 test <-  lapply(params$comparisons, DEP_volcano_peptide, data= pe,  p=params )
 
@@ -712,13 +711,14 @@ for (a in params$comparisons){
 ::: panel-tabset
 ```{r comparison}
 #| results: asis
-
+log_info('Running Analysis for each comparison..')
   for (cmp in names(test)) {
+    log_info( paste0('  --  ',cmp)) 
+
     cmp_label <- gsub(params$contrast,'',cmp )
     cat( '## ', paste(cmp_label,sep=' '), '\n\n')
     cat ('This volcano plot summarizes the differential expression landscape in the comparison between the two groups \n')
     
-    log_info('Volcano')
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp,
@@ -732,7 +732,7 @@ for (a in params$comparisons){
     if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
       cat(' Not Significant proteins to be visualized in in the  heatmap \n')
     }else{
-    log_info('Heatmap')
+  
       render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
                  label = cmp, 
@@ -743,7 +743,7 @@ for (a in params$comparisons){
     cat('\n\n')
     cat('\n\n')
     cat('These bar plots summarizes the number of significantly upregulated/downregulated number of peptide based on different adjusted p-values (selected adjusted p-values are 0.001, 0.01, 0.05, and 0.1 - see facet headers) and log2 fold-change thresholds (on the x-axis) used to define the significance levels.')
-    log_info('barPlot')
+   
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp,
@@ -762,6 +762,8 @@ for (a in params$comparisons){
 In the table you can find a summaries of the number of DE proteins found in all the comparisons. The overlapping of DE proteins among the comparisons is also showed using an upset plot.
 
 ```{r upset plot}
+log_info('DE Summaries computation...')
+
 listInput <- list()
 df_summary = as.data.frame(matrix(ncol=3, nrow=0))
 i <- 1 
@@ -796,7 +798,7 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
    textAlign = 'center')
     
     # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
-    log_info({length(listInput)})
+    #log_info({length(listInput)})
  if (length(listInput)>=2 ) {
     print (upset(fromList(listInput), order.by = "freq"))
      

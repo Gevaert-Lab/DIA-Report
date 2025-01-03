@@ -2,7 +2,7 @@
 
 ```{r}
 
-log_info('dentro Pval')
+log_info('Inside QC P-value distribution ....')
   
 data$toptable %>% ggplot( aes(x=pval,)) +
     geom_histogram(binwidth=.02, alpha=.7, position="identity")
