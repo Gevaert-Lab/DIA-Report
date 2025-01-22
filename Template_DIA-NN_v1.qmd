@@ -107,7 +107,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply','GGally')
 #print(required_packages)
 check_dependencies(required_packages)
 # 
@@ -578,66 +578,7 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
 log_info('PCA Analysis...')
 var_topca <- params$PCA_comparison
 
-if (length(str_which(var_topca, "-"))== 0){
-   prcompPe<-pe[["proteinRS"]] %>%
-        filterNA() %>%
-        assay() %>%
-        t() %>%
-        prcomp()
-  
-  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", var_topca)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[var_topca]]), size=3) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=var_topca)
-		
-   plot(pca_)
-   
-   pdf(file= file.path(params$folder_prj,"Result",paste0("PCA_", var_topca, ".pdf")),paper="a4")
-     plot(pca_)
-     
-      invisible(dev.off())
-   
- } else {
-
-	for (v in var_topca) {
-	  #log_info(v)
-	 
-	  comparisonPCA <- unlist(strsplit(var_topca[var_topca==v],'-',fixed=T))
-	  
-	  prcompPe<-pe[["proteinRS"]] %>%
-			filterNA() %>%
-			assay() %>%
-			t() %>%
-			prcomp()
-		
-	  first_comp <- comparisonPCA[1]
-	  second_comp <- comparisonPCA[2]
-	  #log_info(first_comp)
-	  #log_info(second_comp)
-	  
-	  if (class(colData(pe)[[first_comp]])==class(colData(pe)[[second_comp]])) {
-	  break
-	  }else{
-	  
-		  if (is.numeric(colData(pe)[[first_comp]])){
-			num_comp<-first_comp
-			chr_comp<-second_comp
-			}else {
-			num_comp<-second_comp
-			chr_comp<-first_comp
-			}
-		  #log_info(paste0("numerical ",num_comp))
-		  #log_info(paste0("categorical ",chr_comp))
-		  pca_ <- ggplot(data=prcompPe$x) + ggtitle(paste0("PCA by ", v)) +geom_point(aes(x=PC1, y=PC2, colour= colData(pe)[[num_comp]],shape = colData(pe)[[chr_comp]]), size=3 ) + xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1)))  + ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) + labs(colour=num_comp, shape=chr_comp)
-				
-		 plot(pca_)
-		 
-    
-     pdf(file= file.path(params$folder_prj,"Result",paste0("PCA by ", v, ".pdf")),paper="a4")
-     plot(pca_)
-     
-      invisible(dev.off())
-		 
-		}
-	}
-}
+generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
 
 ```
 
@@ -672,7 +613,7 @@ test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 names(test) <- params$comparisons 
 
 log_info('Saving pe object (qfeatures) as Rds file.')
-saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experimens.Rds"))
+saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"))
 
 
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
