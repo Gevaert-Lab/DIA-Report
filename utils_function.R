@@ -205,8 +205,11 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   
   all_res <-  all_res %>% left_join( temp, by=join_by(Uniprot_id)) 
   
-  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
+  log_info(paste0(cmp,'#by MSqrob: ', dim(all_res)[1]))
   all_res <- all_res[ ! is.na(all_res$adjPval),]
+  log_info(paste0(cmp,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
+  
+  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
   all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
@@ -289,11 +292,13 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
   
   all_res <-  all_res %>% left_join( temp, by=join_by(precursor_id)) 
   
-  
+  log_info(paste0(cmb,'#by MSqrob: ', dim(all_res)[1]))
   all_res <- all_res[ ! is.na(all_res$adjPval),]
+  log_info(paste0(cmb,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
+  
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
-  all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "DOWN"
+  all_res$differential_expressed[all_res$logFC <= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "DOWN"
   #sprintf("Protein_name: %s<br> Gene: %s", all_res$Protein.names, all_res$Gene_symbol)
   
   if ( ! params$ensembl_annotation == '') {
@@ -471,3 +476,83 @@ theme_custom_vis <- function(base_size = 12) {
       strip.text = element_text(size = rel(0.85), face = "bold", color = "#1b2944", margin = margin(5,0,5,0))
     )
 }
+
+
+######------checkGroups-----------------------------------------------------
+#' @author Andrea Argentini
+#' generate_pca_plots
+#' This function generate PCA plot
+
+generate_pca_plots <- function(var_topca, pe, params, layer) {
+  # Define a fixed color palette
+
+  for (v in var_topca) {
+    log_info(v)
+    
+    comparisonPCA <- unlist(strsplit(var_topca[var_topca == v], '-', fixed = TRUE))
+    
+    prcompPe <- pe[[layer]] %>%
+      filterNA() %>%
+      assay() %>%
+      t() %>%
+      prcomp()
+    
+    if (length(comparisonPCA) == 1) {
+      # Handle single variable case
+      single_comp <- comparisonPCA[1]
+      log_info(single_comp)
+      
+      pca_ <- ggplot(data = prcompPe$x) +
+        ggtitle(paste0("PCA by ", v)) +
+        geom_point(aes(x = PC1, y = PC2, colour = factor(colData(pe)[[single_comp]])), size = 3) +
+        xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
+        ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
+        labs(colour = single_comp)
+      
+      plot(pca_)
+      
+      log_info(file.path(params$folder_prj, "Result"))
+      pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
+      plot(pca_)
+      
+      invisible(dev.off())
+      
+    } else if (length(comparisonPCA) == 2) {
+      # Handle two variables case
+      first_comp <- comparisonPCA[1]
+      second_comp <- comparisonPCA[2]
+      log_info(first_comp)
+      log_info(second_comp)
+      
+      if (class(colData(pe)[[first_comp]]) == class(colData(pe)[[second_comp]])) {
+        break
+      } else {
+        if (is.numeric(colData(pe)[[first_comp]])) {
+          num_comp <- first_comp
+          chr_comp <- second_comp
+        } else {
+          num_comp <- second_comp
+          chr_comp <- first_comp
+        }
+        log_info(paste0("numerical ", num_comp))
+        log_info(paste0("categorical ", chr_comp))
+        
+        pca_ <- ggplot(data = prcompPe$x) +
+          ggtitle(paste0("PCA by ", v)) +
+          geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[num_comp]], shape = colData(pe)[[chr_comp]]), size = 3) +
+          xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
+          ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
+          labs(colour = num_comp, shape = chr_comp)
+        
+        plot(pca_)
+        
+        log_info(file.path(params$folder_prj, "Result"))
+        pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
+        plot(pca_)
+        
+        invisible(dev.off())
+      }
+    }
+  }
+}
+

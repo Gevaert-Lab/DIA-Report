@@ -30,8 +30,8 @@ The repository contains two Quarto templates:
 - `Template_DIA-NN_Peptide_v1.qmd` : Template for peptide level analysis report
 
 ## Input parameters
-The parameters must be indicated in a yaml file. You can an example in `parameters.yaml`.
-The description of the paramaters is the following:
+The parameters must be indicated in a yaml file. You can find an example in `parameters.yaml`.
+The description of the parameters is the following:
 
 - `title`: title of the report
 - `subtitle`: subtitle
