@@ -205,8 +205,11 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
   
   all_res <-  all_res %>% left_join( temp, by=join_by(Uniprot_id)) 
   
-  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
+  log_info(paste0(cmp,'#by MSqrob: ', dim(all_res)[1]))
   all_res <- all_res[ ! is.na(all_res$adjPval),]
+  log_info(paste0(cmp,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
+  
+  #all_res$Protein.names <- rowData(pe[["proteinRS"]])[['Protein.names']]
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
   all_res$differential_expressed[all_res$logFC <= - params$FC_thr & all_res$adjPval <  params$adjpval_thr] <- "DOWN"
@@ -289,8 +292,10 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
   
   all_res <-  all_res %>% left_join( temp, by=join_by(precursor_id)) 
   
-  
+  log_info(paste0(cmb,'#by MSqrob: ', dim(all_res)[1]))
   all_res <- all_res[ ! is.na(all_res$adjPval),]
+  log_info(paste0(cmb,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
+  
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
   all_res$differential_expressed[all_res$logFC <= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "DOWN"

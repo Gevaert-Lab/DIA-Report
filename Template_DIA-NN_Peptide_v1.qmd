@@ -114,7 +114,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally')
 #print(required_packages)
 check_dependencies(required_packages)
 # 
@@ -570,6 +570,60 @@ peptidemissingness <- MSnbase::plotNA(assay(pe[["peptideNorm"]])) +
 ```
 
 
+
+
+## Completeness Analysis 
+
+This section analyzes the completeness of protein readouts across all samples within each group. For each quantified peptide, a completeness percentage is calculated based on the proportion of missing values across all samples in the group. These percentages are compared between the groups in the lower diagonal. On the diagonal, a histogram illustrates the distribution of detection percentages for each group
+
+```{r completeness_analysis}
+log_info('Completness Analysis...')
+   custom_lower <- function(data, mapping, ...) {
+    
+      x_data <- data[[as_label(mapping$x)]]
+      y_data <- data[[as_label(mapping$x)]]
+     
+      
+      # Calculate mean and standard deviation
+      mean_x <- mean(x_data, na.rm = TRUE)
+      mean_y <- mean(y_data, na.rm = TRUE)
+      sd_x <- sd(x_data, na.rm = TRUE)
+      sd_y <- sd(y_data, na.rm = TRUE)
+      
+      ggplot(data = data, mapping = mapping) +
+      geom_jitter(  size=1,alpha= 0.8)+
+      geom_abline(slope = 1, intercept = mean_y - mean_x, color = 'blue')+
+      geom_abline(slope = 1, intercept = mean_y - mean_x + sd_y + sd_x, color = 'red', linetype = "dashed") +       # Mean + sigma line
+        geom_abline(slope = 1, intercept = mean_y - mean_x - sd_y - sd_x, color = 'red', linetype = "dashed")       # Mean - sigma line
+      
+      
+    }
+    
+    
+    custom_diag <- function(data, mapping, ...) {
+      ggplot(data = data, mapping = mapping) + 
+        geom_histogram(binwidth = 10, fill = "blue", color = "black") 
+    }
+    
+    
+    custom_diag <- function(data, mapping, ...) {
+      ggplot(data = data, mapping = mapping) + 
+        geom_histogram(binwidth = 10, fill = "blue", color = "black") 
+    }
+    
+    
+    as.data.frame(rowData(pe[['peptideNorm']])) %>% 
+      select(matches("^perc"))  %>% 
+      ggpairs(
+               upper = list(continuous = wrap("blank")),
+              diag = list(continuous = custom_diag),
+      lower = list(continuous = custom_lower),
+      xlab = "percentage of detection",
+      ylab = "percentage of detection"
+      )
+  
+
+```
 
 ## PCA
 
