@@ -147,31 +147,60 @@ check_length_design_data  <- function  (data_ , design){
 #' 
 #' @return status : A data frame of DIA-NN in a wide format 
 
-dfToWideMsqrob <- function(data, precursorquan) {
-  data %>%
-    filter(
-      PG.Q.Value <= 0.01 &
-        Q.Value <= 0.01 &
-        Precursor.Id != "" & 
-        .data[[precursorquan]] > 0
-    ) %>%
-    dplyr::select(
-      File.Name, 
-      Precursor.Id, 
-      Modified.Sequence, 
-      Stripped.Sequence, 
-      Protein.Group,
-      Protein.Ids, 
-      Protein.Names, 
-      Genes, 
-      Proteotypic,
-      First.Protein.Description,
-      .data[[precursorquan]]
-    ) %>%
-    tidyr::pivot_wider(
-      names_from = File.Name,
-      values_from = .data[[precursorquan]]
-    )
+dfToWideMsqrob <- function(data, precursorquan, mbr) {
+  
+  if (mbr == TRUE) {
+    
+    data %>%
+      filter(
+        Global.PG.Q.Value <= 0.01 &
+          Global.Q.Value <= 0.01 &
+          Precursor.Id != "" & 
+          .data[[precursorquan]] > 0
+      ) %>%
+      dplyr::select(
+        File.Name, 
+        Precursor.Id, 
+        Modified.Sequence, 
+        Stripped.Sequence, 
+        Protein.Group,
+        Protein.Ids, 
+        Protein.Names, 
+        Genes, 
+        Proteotypic,
+        First.Protein.Description,
+        .data[[precursorquan]]
+      ) %>%
+      tidyr::pivot_wider(
+        names_from = File.Name,
+        values_from = .data[[precursorquan]]
+      )
+    
+  }else{   data %>%
+      filter(
+        PG.Q.Value <= 0.01 &
+          Q.Value <= 0.01 &
+          Precursor.Id != "" & 
+          .data[[precursorquan]] > 0
+      ) %>%
+      dplyr::select(
+        File.Name, 
+        Precursor.Id, 
+        Modified.Sequence, 
+        Stripped.Sequence, 
+        Protein.Group,
+        Protein.Ids, 
+        Protein.Names, 
+        Genes, 
+        Proteotypic,
+        First.Protein.Description,
+        .data[[precursorquan]]
+      ) %>%
+      tidyr::pivot_wider(
+        names_from = File.Name,
+        values_from = .data[[precursorquan]]
+      ) }
+ 
 }
 
 ######--- DEP_volcano----------------------------
@@ -292,9 +321,9 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
   
   all_res <-  all_res %>% left_join( temp, by=join_by(precursor_id)) 
   
-  log_info(paste0(cmb,'#by MSqrob: ', dim(all_res)[1]))
+  log_info(paste0(cmp,'#by MSqrob: ', dim(all_res)[1]))
   all_res <- all_res[ ! is.na(all_res$adjPval),]
-  log_info(paste0(cmb,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
+  log_info(paste0(cmp,'# by MSqrob after p-adj Null filt.: ', dim(all_res)[1]))
   
   all_res$differential_expressed <- "NO"
   all_res$differential_expressed[all_res$logFC >= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "UP"
@@ -478,7 +507,7 @@ theme_custom_vis <- function(base_size = 12) {
 }
 
 
-######------checkGroups-----------------------------------------------------
+######------generate_pca_plots--------------------------------------------
 #' @author Andrea Argentini
 #' generate_pca_plots
 #' This function generate PCA plot

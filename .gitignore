@@ -60,6 +60,8 @@ Sam_project/
 
 Demo_project/
 
+Test/
+
 *.html
 
 *.jpg
@@ -69,3 +71,4 @@ Demo_project/
 *.Rproj
 
 *.Rds
+

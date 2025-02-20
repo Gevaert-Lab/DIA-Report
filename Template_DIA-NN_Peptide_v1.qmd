@@ -50,6 +50,7 @@ params:
   PCA_comparison: "Group"
   quantitatve_features: "Precursor.Quantity"
   filtPerGroup: TRUE
+  mbr: FALSE
 ---
 
 <!-- <style> -->
@@ -117,28 +118,7 @@ required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","vis
                     "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally')
 #print(required_packages)
 check_dependencies(required_packages)
-# 
-# library(QFeatures)
-# library(msqrob2)
-# library(readxl)
-# library(SummarizedExperiment)
-# library(visdat)
-# library(ggrepel)
-# library(dplyr)
-# library(tidyverse)
-# library(magrittr)
-# library(here)
-# library(tidyr)
-# library(plotly)
-# library(DT)
-# library(tibble)
-# library(MSnbase)
-# library(factoextra)
-# library(hrbrthemes)
-# library(gridExtra)
-# library(UpSetR)
-#library(heatmaply)
-# #webshot::install_phantomjs()
+
 ```
 
 ## Experiment Description 
@@ -211,7 +191,7 @@ theme_set(theme_custom_vis())
 ## Import data
 
 Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitatve_features`* from DIA-NN as quantitative features.
-All the precursors with *Q-value \< 0.01* are used for the analysis.
+`r if (params$mbr) 'All the precursors with *Global Q-value and Global PG Q-value < 0.01* are used for the analysis' else 'All the precursors with *Q-value and PG Qvalue < 0.01* are used for the analysis'`
 
 ```{r import data}
   # 'peptidesRCB.txt'  
@@ -227,7 +207,7 @@ All the precursors with *Q-value \< 0.01* are used for the analysis.
     stop(checkDIANN$error)
     } 
   
-  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features)
+  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features,  mbr = params$mb)
  
   result_check <- check_design_data(dfMsqrob,design) 
   

@@ -48,7 +48,8 @@ input_report_parameter <- list(title =  "ADD TITLE",
                                FC_thr= 0.5,
                                filtering_contaminats= FALSE,
                                quantitatve_features= "Precursor.Quantity", #DIA-NN quantitative feature to use
-                               filtPerGroup=TRUE  ## Filtering per group
+                               filtPerGroup=TRUE , ## Filtering per group
+                               mbr= TRUE ## True if you have used MBR in your diaNN settings
                                
 )
 
