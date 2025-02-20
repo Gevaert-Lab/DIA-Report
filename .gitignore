@@ -60,7 +60,7 @@ Sam_project/
 
 Demo_project/
 
-Test/
+Test/*
 
 *.html
 
@@ -72,3 +72,5 @@ Test/
 
 *.Rds
 
+
+Test/
