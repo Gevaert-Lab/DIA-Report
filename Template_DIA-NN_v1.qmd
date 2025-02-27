@@ -252,7 +252,9 @@ if (check_confounder_list$status == 1){
    base_name_sample =  basename(filename) ) 
     
   }
-  
+  # samplenames <- tibble(
+  # base_name_sample = names(a_wide )[str_which(names(a_wide ), paste0('\\','CMB'))]  ) 
+
   
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
  

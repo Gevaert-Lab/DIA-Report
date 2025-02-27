@@ -203,6 +203,69 @@ dfToWideMsqrob <- function(data, precursorquan, mbr) {
  
 }
 
+######-----dfToWideMsqrob_20-------------------------
+#' @author Andrea
+#' dfToWideMsqrob
+#' This function after some quality check makes and filtering of some columns 
+#' It makes  wide version of the DIA-NN result using the precursorquant columns
+#' @param data frame containing the DIA-NN report data
+#' @param precursorquan: columns to use to pivot into a wide format 
+#' 
+#' @return status : A data frame of DIA-NN in a wide format 
+dfToWideMsqrob_20 <- function(data, precursorquan, mbr) {
+  
+  if (mbr == TRUE) {
+    
+    data %>%
+      filter(
+        Global.PG.Q.Value <= 0.01 &
+          Global.Q.Value <= 0.01 &
+          Precursor.Id != "" & 
+          .data[[precursorquan]] > 0
+      ) %>%
+      dplyr::select(
+        Run, 
+        Precursor.Id, 
+        Modified.Sequence, 
+        Stripped.Sequence, 
+        Protein.Group,
+        Protein.Ids, 
+        Protein.Names, 
+        Genes, 
+        Proteotypic,
+        .data[[precursorquan]]
+      ) %>%
+      tidyr::pivot_wider(
+        names_from = Run,
+        values_from = .data[[precursorquan]]
+      )
+    
+  }else{   data %>%
+      filter(
+        PG.Q.Value <= 0.01 &
+          Q.Value <= 0.01 &
+          Precursor.Id != "" & 
+          .data[[precursorquan]] > 0
+      ) %>%
+      dplyr::select(
+        Run, 
+        Precursor.Id, 
+        Modified.Sequence, 
+        Stripped.Sequence, 
+        Protein.Group,
+        Protein.Ids, 
+        Protein.Names, 
+        Genes, 
+        Proteotypic,
+        .data[[precursorquan]]
+      ) %>%
+      tidyr::pivot_wider(
+        names_from = Run,
+        values_from = .data[[precursorquan]]
+      ) }
+  
+}
+
 ######--- DEP_volcano----------------------------
 #' @author Andrea Argentini 
 #' DEP_volcano

@@ -44,7 +44,7 @@ The description of the parameters is the following:
 - `contrast`: name of the column present in experiment design file used in the model. (default is Group)
 - `aggr_method`: summaration method used [medianPolish robustSummary() , colMeans(), colMedians(), base::colSums()]
 - `normalization`: normalization method [ sum, max, center.mean, center.median", div.mean, div.median", diff.meda, ⁠quantiles⁠, ⁠quantiles.robust⁠ , vsn]
-- `Proteotypic`: include only proteotypic peptides (Boolen: TRUE / FALSE )
+- `Proteotypic`: include only proteotypic peptides (Boolean: TRUE / FALSE )
 - `pep_per_prot`: number of peptides per proteins
 - `nNonZero`: min percentage of samples with non missing value (used along with `filtPerGroup`)
 - `comparisons`: list of the comparison to use
@@ -58,6 +58,7 @@ The description of the parameters is the following:
 - `PCA_comparison`: list of cofounder values to use in PCA analysis
 - `quantitatve_features`: quantitative feature column to use
 - `filtPerGroup`: filtering of the NaN value based on `nNonZero` value applied per group (TRUE) or along all the sample (FALSE)
+- `mbr`: in case of MBR activated in DIA-NN, use Global.Q-value and Global.PG.Q-values to select precursor (Boolean: TRUE / FALSE )
 
 Parameters can be also given as R list as showed in `Run_Template_FromR.R` and `Run_Template_FromR_peptide.R`.
 
