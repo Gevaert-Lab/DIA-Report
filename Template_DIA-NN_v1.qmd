@@ -47,6 +47,8 @@ params:
   quantitatve_features: "Precursor.Quantity"
   filtPerGroup: TRUE
   mbr: FALSE
+  wildstr_run: "CMB-"
+  DIANN_ver2: FALSE 
 ---
 
 <!-- <style> -->
@@ -108,7 +110,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply','GGally')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply','GGally','arrow')
 #print(required_packages)
 check_dependencies(required_packages)
 
@@ -190,23 +192,45 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 
 ```{r import data}
 
-  log_info('Reading Data...')
-  data <- read.csv(params$input_file,sep='\t')
+  if (params$DIANN_ver2){
+     log_info('Reading Data PARQUET format...')
+     data <- read_parquet(params$input_file)
+     
+  }else{
+     log_info('Reading Data TSV format...')
+     data <- read.csv(params$input_file,sep='\t')
+  }
+ 
   ## deal csv  with different separated values 
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  checkDIANN<-check_DIANN_report(data, q_feature=params$quantitatve_features)
+  
+  
+  checkDIANN <- check_DIANN_report(data, q_feature=params$quantitatve_features)
     
   if (checkDIANN$status == 1 ) {
     stop(checkDIANN$error)
     } 
   
-  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features, mbr = params$mbr)
+  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features, mbr = params$mbr)
+  
+  if (params$DIANN_ver2){
+    log_info('Retrieve Protein description(ver > 2.0)...')
+
+    prt_desc <- read.csv( file.path(dirname(params$input_file),'report.protein_description.tsv'),sep="\t"  )
+    
+    dfMsqrob<- dfMsqrob %>% mutate(app = sapply(str_split(Protein.Names, ";"), function(x) ifelse(length(x) > 0, x[1], NA))) %>% 
+       left_join( prt_desc %>% select(Protein.Name,Description) , 
+                  join_by(app == Protein.Name)) %>% 
+      select(- app) %>% rename( First.Protein.Description =  Description   ) # filter(is.na(Description)) 
+    }
+  
+
  
   result_check <- check_design_data(dfMsqrob,design) 
   
-  if (result_check$status == 1 |  is.na(result_check$type_raw) ){
+  if (result_check$status == 1  ){
     stop(result_check$error)
   }  
   
@@ -231,39 +255,29 @@ if (check_groups$status == 1){
 
   if (all(params$confounder_list != '')) {
   check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
-if (check_confounder_list$status == 1){
-    stop(check_confounder_list$error)
-}
+    if (check_confounder_list$status == 1){
+        stop(check_confounder_list$error)
+    }
   }
 
-  
-  if ( .Platform$OS.type == "unix" ){
-    samplenames <- tibble(
-   filename = gsub('\\\\','/' ,names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)]), 
-   base_name_sample =  basename(filename) ) 
-  
-  }else{
- #    samplenames <- tibble(
-#   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
- #  base_name_sample =  basename(filename) ) 
-    
-  samplenames <- tibble(
-  filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
-   base_name_sample =  basename(filename) ) 
-    
-  }
-  # samplenames <- tibble(
-  # base_name_sample = names(a_wide )[str_which(names(a_wide ), paste0('\\','CMB'))]  ) 
 
+  #  params$wildstr_run
   
+   samplenames <- tibble(
+     base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   'CMB-' )  ]
+      ) 
+    
+ 
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
- 
- 
-  names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))] <- samplenames$sample
+  # debugging
+  # names(a_wide)[str_which(names(a_wide), paste0('\\','CMB-'))] <- samplenames$sample
+  # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
+
+
+  names(dfMsqrob)[str_which(names(dfMsqrob),  'CMB-' ) ] <- samplenames$sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
- 
 
 ```
 
@@ -275,7 +289,7 @@ if (check_confounder_list$status == 1){
 
  pe <- readQFeatures( dfMsqrob,
                      fnames = "Precursor.Id",
-                     ecol =  str_detect(names(dfMsqrob), paste(diann_colname, collapse = "|"), negate=TRUE) ,
+                     ecol =  str_detect(names(dfMsqrob), paste( diann_colname , collapse = "|"), negate=TRUE) ,
                      name = "precursor")
 
 

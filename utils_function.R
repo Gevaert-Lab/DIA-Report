@@ -61,7 +61,7 @@ check_DIANN_report <- function  (data_ , q_feature){
  
 check_design_data  <- function  (data_ , design){
   status <- 0
-  type_raw <- NA
+  #type_raw <- NA
   error <-
     
   data_sample <- colnames(data_)[10:length(colnames(data_))]
@@ -72,12 +72,12 @@ check_design_data  <- function  (data_ , design){
     #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
     error <-  capture.output(cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' ))
     status <- 1
-    return(list(status=status, type_raw=type_raw,error=error))
+    return(list(status=status ,error=error))
   }
   
-  type_raw <- str_match(data_sample,'\\..*')[,1][1]
+  #type_raw <- str_match(data_sample,'\\..*')[,1][1]
   
-  return(list(status=status, type_raw=type_raw))
+  return(list(status=status))
   
 }
 
@@ -102,7 +102,8 @@ check_length_design_data  <- function  (data_ , design){
   message <- ''
   
   data_sample <- colnames(data_)[10:length(colnames(data_))]
-  d_sample <- design %>% dplyr::select(filename) %>% pull()
+  ## filename does not exist 
+  d_sample <- design %>% dplyr::select(run) %>% pull()
   
   
   if (length(data_sample) < length(d_sample)){
@@ -117,12 +118,13 @@ check_length_design_data  <- function  (data_ , design){
     status <- 1
     return(list(status=status,error=error,message=message))	
   }
-  
+  ### pay attention here 
   if (length(data_sample) > length(d_sample)){
     status <- 2
     dfSample<- dfMsqrob[,(colnames(dfMsqrob)%in% d_sample)]
+    ## "First.Protein.Description" on hold for the moment
     df  <- cbind(dfMsqrob[, c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
-                        "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")], dfSample)
+                        "Protein.Ids","Protein.Names","Genes","Proteotypic")], dfSample)
     message <- 'Number of samples in DIA-NN is bigger than number of samples in design file.'
     return(list(status=status, error = error, message=message , data_ = df))
   }else{
@@ -140,6 +142,8 @@ check_length_design_data  <- function  (data_ , design){
 ######-----dfToWideMsqrob-------------------------
 #' @author Leander 
 #' dfToWideMsqrob
+#' This is not used anymore, should be remove soon. 
+#' MAching od sample name with run now is dobe using run columns
 #' This function after some quality check makes and filtering of some columns 
 #' It makes  wide version of the DIA-NN result using the precursorquant columns
 #' @param data frame containing the DIA-NN report data
