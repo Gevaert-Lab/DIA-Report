@@ -219,6 +219,10 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     log_info('Retrieve Protein description(ver > 2.0)...')
 
     prt_desc <- read.csv( file.path(dirname(params$input_file),'report.protein_description.tsv'),sep="\t"  )
+    if ( ! file.exists(file.path(dirname(params$input_file),'report.protein_description.tsv'))){
+      	stop(paste0('file ',report.protein_description.tsv,  'not found in folder ->',
+      	            dirname(params$input_file),'\n','Check your input path !' ))
+    }
     
     dfMsqrob<- dfMsqrob %>% mutate(app = sapply(str_split(Protein.Names, ";"), function(x) ifelse(length(x) > 0, x[1], NA))) %>% 
        left_join( prt_desc %>% select(Protein.Name,Description) , 
@@ -249,12 +253,12 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   
   
   check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-if (check_groups$status == 1){
-    stop(check_groups$error)
-}  
+  if (check_groups$status == 1){
+      stop(check_groups$error)
+  }  
 
   if (all(params$confounder_list != '')) {
-  check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
         stop(check_confounder_list$error)
     }
@@ -263,9 +267,9 @@ if (check_groups$status == 1){
 
   #  params$wildstr_run
   
-   samplenames <- tibble(
-     base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   'CMB-' )  ]
-      ) 
+ samplenames <- tibble(
+   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   params$wildstr_run )  ]
+    ) 
     
  
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )

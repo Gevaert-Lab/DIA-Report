@@ -51,6 +51,8 @@ params:
   quantitatve_features: "Precursor.Quantity"
   filtPerGroup: TRUE
   mbr: FALSE
+  wildstr_run: "CMB-"
+  DIANN_ver2: FALSE 
 ---
 
 <!-- <style> -->
@@ -115,7 +117,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally','arrow')
 #print(required_packages)
 check_dependencies(required_packages)
 
@@ -194,10 +196,19 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 `r if (params$mbr) 'All the precursors with *Global Q-value and Global PG Q-value < 0.01* are used for the analysis' else 'All the precursors with *Q-value and PG Qvalue < 0.01* are used for the analysis'`
 
 ```{r import data}
-  # 'peptidesRCB.txt'  
-  log_info('Reading Data...')
-  data <- read.csv(params$input_file,sep='\t')
-  ## deal csv  with different separated values 
+
+  if (params$DIANN_ver2){
+   log_info('Reading Data PARQUET format...')
+   data <- read_parquet(params$input_file)
+   
+  }else{
+     log_info('Reading Data TSV format...')
+     data <- read.csv(params$input_file,sep='\t')
+  }
+ 
+  
+  
+  
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
@@ -207,62 +218,65 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     stop(checkDIANN$error)
     } 
   
-  dfMsqrob <- dfToWideMsqrob( data, precursorquan = params$quantitatve_features,  mbr = params$mb)
- 
-  result_check <- check_design_data(dfMsqrob,design) 
+  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features,  mbr = params$mb)
   
-  if (result_check$status == 1 |  is.na(result_check$type_raw) ){
+  if (params$DIANN_ver2){
+    log_info('Retrieve Protein description(ver > 2.0)...')
+  
+    prt_desc <- read.csv( file.path(dirname(params$input_file),'report.protein_description.tsv'),sep="\t"  )
+    if ( ! file.exists(file.path(dirname(params$input_file),'report.protein_description.tsv'))){
+      	stop(paste0('file ',report.protein_description.tsv,  'not found in folder ->',
+      	            dirname(params$input_file),'\n','Check your input path !' ))
+    }
+  
+    dfMsqrob<- dfMsqrob %>% mutate(app = sapply(str_split(Protein.Names, ";"), function(x) ifelse(length(x) > 0, x[1], NA))) %>% 
+     left_join( prt_desc %>% select(Protein.Name,Description) , 
+                join_by(app == Protein.Name)) %>% 
+    select(- app) %>% rename( First.Protein.Description =  Description   ) # filter(is.na(Description)) 
+  }
+
+  result_check <- check_design_data(dfMsqrob,design) 
+
+  if (result_check$status == 1  ){
     stop(result_check$error)
-  }  
+    }  
   
   
   checkLength<-check_length_design_data(dfMsqrob, design)
 
   if (checkLength$status==1){
-	stop(checkLength$error)
+	  stop(checkLength$error)
   }
   
   if (checkLength$status==2){
-  dfMsqrob <- checkLength$data_
-  log_info(checkLength$message)
-  #checkLength$message
+    dfMsqrob <- checkLength$data_
+    log_info(checkLength$message)
+    #checkLength$message
   }
   
   
   check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-if (check_groups$status == 1){
+  if (check_groups$status == 1){
     stop(check_groups$error)
-}  
+  }  
 
   if (all(params$confounder_list != '')) {
-  check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
-if (check_confounder_list$status == 1){
-    stop(check_confounder_list$error)
-}
+    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+    if (check_confounder_list$status == 1){
+        stop(check_confounder_list$error)
+    }
   }
 
   
-  if ( .Platform$OS.type == "unix" ){
-    samplenames <- tibble(
-   filename = gsub('\\\\','/' ,names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)]), 
-   base_name_sample =  basename(filename) ) 
-  
-  }else{
- #    samplenames <- tibble(
-#   filename = names(dfMsqrob)[str_which(names(dfMsqrob), result_check$type_raw)], 
- #  base_name_sample =  basename(filename) ) 
-    
   samplenames <- tibble(
-  filename = names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))], 
-   base_name_sample =  basename(filename) ) 
-    
-  }
+   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   params$wildstr_run )  ]
+    ) 
   
   
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
  
  
-  names(dfMsqrob)[str_which(names(dfMsqrob), paste0('\\',result_check$type_raw))] <- samplenames$sample
+  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")

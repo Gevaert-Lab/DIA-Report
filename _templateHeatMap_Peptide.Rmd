@@ -17,7 +17,7 @@ data <-  assay(pe[["peptideNorm"]])[selected,rownames(app)]
 
 #log_info(dim(data)[1])
 #log_info(dim(data)[2])
- if (dim(data)[1] > 5) {
+ if (dim(data)[1] > 5 & dim(data)[1] <= 50 ) {
 #     if (dim(data)[1] >= 50 & dim(data)[2] < 25){
 #       w <- 1200
 #       h <- 900 
@@ -31,7 +31,7 @@ data <-  assay(pe[["peptideNorm"]])[selected,rownames(app)]
     heatmaply::heatmaply(data, scale = "column" , dendrogram =  "none", width = 1200 , height =900 ,   cexRow = 1, cexCol = 0.8 , file =  file.path(path,paste0("Heatmap_DE_proteins",".pdf")))    
     
   } else {
-    cat ('Not enough DE peptides for heatmap visualization')
+    cat ('Not enough DE peptides (OR) Too many DE peptides for heatmap visualization')
 }
 
 
