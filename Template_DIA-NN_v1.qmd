@@ -195,10 +195,12 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   if (params$DIANN_ver2){
      log_info('Reading Data PARQUET format...')
      data <- read_parquet(params$input_file)
+     lst_wide_columns <- c('Run', 'Precursor.Id', 'Modified.Sequence', 'Stripped.Sequence', 'Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes', 'Proteotypic')
      
   }else{
      log_info('Reading Data TSV format...')
      data <- read.csv(params$input_file,sep='\t')
+     lst_wide_columns <- c('Run', 'Precursor.Id', 'Modified.Sequence', 'Stripped.Sequence', 'Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes', 'Proteotypic','First.Protein.Description')
   }
  
   ## deal csv  with different separated values 
@@ -213,15 +215,16 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     stop(checkDIANN$error)
     } 
   
-  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features, mbr = params$mbr)
+
+  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features, mbr = params$mbr, wide_colums = lst_wide_columns)
   
   if (params$DIANN_ver2){
-    log_info('Retrieve Protein description(ver > 2.0)...')
+    log_info('Retrieve Protein description (ver > 2.0)...')
 
     prt_desc <- read.csv( file.path(dirname(params$input_file),'report.protein_description.tsv'),sep="\t"  )
     if ( ! file.exists(file.path(dirname(params$input_file),'report.protein_description.tsv'))){
       	stop(paste0('file ',report.protein_description.tsv,  'not found in folder ->',
-      	            dirname(params$input_file),'\n','Check your input path !' ))
+      	            dirname(params$input_file),'\n',' Check your input path !' ))
     }
     
     dfMsqrob<- dfMsqrob %>% mutate(app = sapply(str_split(Protein.Names, ";"), function(x) ifelse(length(x) > 0, x[1], NA))) %>% 
@@ -377,9 +380,6 @@ size <- dim(colData(pe))[1]
 
 ## filtering per group
 
-
-
- pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
 
   if (params$filtPerGroup) {
       log_info('filtering per group')

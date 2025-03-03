@@ -216,7 +216,9 @@ dfToWideMsqrob <- function(data, precursorquan, mbr) {
 #' @param precursorquan: columns to use to pivot into a wide format 
 #' 
 #' @return status : A data frame of DIA-NN in a wide format 
-dfToWideMsqrob_20 <- function(data, precursorquan, mbr) {
+#' 
+
+dfToWideMsqrob_20 <- function(data, precursorquan, mbr, wide_colums) {
   
   if (mbr == TRUE) {
     
@@ -228,15 +230,7 @@ dfToWideMsqrob_20 <- function(data, precursorquan, mbr) {
           .data[[precursorquan]] > 0
       ) %>%
       dplyr::select(
-        Run, 
-        Precursor.Id, 
-        Modified.Sequence, 
-        Stripped.Sequence, 
-        Protein.Group,
-        Protein.Ids, 
-        Protein.Names, 
-        Genes, 
-        Proteotypic,
+        wide_colums,
         .data[[precursorquan]]
       ) %>%
       tidyr::pivot_wider(
@@ -252,15 +246,7 @@ dfToWideMsqrob_20 <- function(data, precursorquan, mbr) {
           .data[[precursorquan]] > 0
       ) %>%
       dplyr::select(
-        Run, 
-        Precursor.Id, 
-        Modified.Sequence, 
-        Stripped.Sequence, 
-        Protein.Group,
-        Protein.Ids, 
-        Protein.Names, 
-        Genes, 
-        Proteotypic,
+        wide_colums,
         .data[[precursorquan]]
       ) %>%
       tidyr::pivot_wider(
