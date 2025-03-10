@@ -73,4 +73,4 @@ Test/*
 *.Rds
 
 
-Test/
+Test/*

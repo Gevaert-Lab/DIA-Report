@@ -489,6 +489,65 @@ check_dependencies = function(required_packages = required_packages){
   
 }
 
+
+
+### TOBEcheched!!checkVariables!!! ------------------
+checkVariables <- function(inputParams, dfDesign, variables) {
+  # Initialize lists to collect status and errors
+  statusList <- list()
+  errorList <- list()
+  
+  # 1. Split by '-'
+  terms <- unlist(strsplit(inputParams, ' - ', fixed = TRUE))
+  
+  # Function to process each term (A and B from the prompt)
+  processTerm <- function(term) {
+    # Remove parentheses
+    term <- gsub("[()]", "", term)
+    
+    # 2. Split by ':' and '+'
+    parts <- unlist(strsplit(term, "[:+]"))
+    
+    # 3. Clean up and extract variable values
+    values <- trimws(parts)
+    values <- values[values != ""]  # Remove empty strings
+    
+    return(values)
+  }
+  
+  # Process each term
+  extractedValues <- unlist(lapply(terms, processTerm))
+  
+  extractedValues <- unique(extractedValues)
+
+  for (variable in variables) {
+    
+    extracted <- gsub(variable, "", extractedValues[grepl(variable, extractedValues,ignore.case = TRUE)], ignore.case = TRUE)
+
+    # Check if the extracted values are present in the corresponding column in dfDesign
+    if (!all(extracted %in% unique(dfDesign[[variable]])) == TRUE) {
+      error <- capture.output(cat(paste(variable, ' values in comparison do not match', variable, 'values in design file')))
+      status <- 1
+    } else {
+      error <- ""
+      status <- 0
+    }
+    
+    # Append the status and error to the lists
+    statusList[[variable]] <- status
+    errorList[[variable]] <- error
+  }
+  
+  # Aggregate the results
+  overallStatus <- ifelse(any(unlist(statusList) == 1), 1, 0)
+  overallError <- paste(unlist(errorList), collapse = "\n")
+  
+  return(list(status = overallStatus, error = overallError))
+}
+
+
+
+
 ######------checkGroups-----------------------------------------------------
 #' @author Caterina Lizzio
 #' checkGroups
@@ -563,11 +622,22 @@ theme_custom_vis <- function(base_size = 12) {
 ######------generate_pca_plots--------------------------------------------
 #' @author Andrea Argentini
 #' generate_pca_plots
-#' This function generate PCA plot
+#' This function generate PCA plots from a list of cofounder or variables 
+#' included in the colData informationof the Q-features object.
+#' It is allowed only two variable per plot (shape and color), and the valid 
+#' combination of variable types are: 
+#' - Character | Factor and  Character | Factor (e.g Group-timepoints)
+#' - Numerical  and   Character | Factor  (e.g Group-BMI)
+#' -  Character | Factor (single variable) (e.g Group, Replicates)
+#' @param var_topca List of variables to use it color/shape samples in the PCA plots
+#' @param pe Q-features object
+#' @param params List  of the current run
+#' @param layer Layer of the Q-features object to use for the PCA 
+#' @return None  plots both on the device and on file in PDF format
 
 generate_pca_plots <- function(var_topca, pe, params, layer) {
   # Define a fixed color palette
-
+  
   for (v in var_topca) {
     log_info(v)
     
@@ -603,12 +673,35 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
       # Handle two variables case
       first_comp <- comparisonPCA[1]
       second_comp <- comparisonPCA[2]
-      log_info(first_comp)
-      log_info(second_comp)
+      log_info('Same type of variable')
+      
       
       if (class(colData(pe)[[first_comp]]) == class(colData(pe)[[second_comp]])) {
-        break
+        # Both variables are of the same type
+        if (is.character(colData(pe)[[first_comp]]) | is.factor(colData(pe)[[first_comp]])  ) {
+          # Both are character variables
+          pca_ <- ggplot(data = prcompPe$x) +
+            ggtitle(paste0("PCA by ", v)) +
+            geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[first_comp]], shape = colData(pe)[[second_comp]]), size = 3) +
+            xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
+            ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
+            labs(colour = first_comp, shape = second_comp)
+          
+          plot(pca_)
+          
+          
+          log_info(file.path(params$folder_prj, "Result"))
+          pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
+          plot(pca_)
+          
+          invisible(dev.off())
+        } else {
+          # Both are numeric variables
+          log_info('I m breaking')
+          break
+        }
       } else {
+        # Variables are of different types
         if (is.numeric(colData(pe)[[first_comp]])) {
           num_comp <- first_comp
           chr_comp <- second_comp
@@ -621,7 +714,7 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
         
         pca_ <- ggplot(data = prcompPe$x) +
           ggtitle(paste0("PCA by ", v)) +
-          geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[num_comp]], shape = colData(pe)[[chr_comp]]), size = 3) +
+          geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[num_comp]], shape = factor(colData(pe)[[chr_comp]])), size = 3) +
           xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
           ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
           labs(colour = num_comp, shape = chr_comp)
@@ -637,4 +730,21 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
     }
   }
 }
-
+##-----------check_and_substitute_forbidden_chars--------------
+#' @author Andrea Argentini
+#' check_and_substitute_forbidden_chars
+#' This function removes eventually character not allowed in the Win. file name system
+#' @param input_string input string with possible 
+#' @return outputstr_chr_removed  output string
+ 
+check_and_substitute_forbidden_chars <- function(input_string) {
+  # Define forbidden characters for filenames in Windows
+  forbidden_chars <- c("<", ">", ":", "\"", "/", "\\", "|", "?", "*")
+  
+  # Iterate over each forbidden character and replace it with an empty space
+  for (char in forbidden_chars) {
+    input_string <- gsub(char, " ", input_string, fixed = TRUE)
+  }
+  
+  return(input_string)
+}

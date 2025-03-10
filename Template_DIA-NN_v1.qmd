@@ -254,19 +254,27 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   #checkLength$message
   }
   
-  
-  check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-  if (check_groups$status == 1){
-      stop(check_groups$error)
-  }  
-
+  ## first check confounders in design file
   if (all(params$confounder_list != '')) {
     check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
         stop(check_confounder_list$error)
     }
   }
+  
+  ## Simple version   
+  # check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
+  # if (check_groups$status == 1){
+  #     stop(check_groups$error)
+  # }
 
+  var2check <- 'group'
+  var2check <- append(var2check,params$confounder_list)
+  checkVar_res <-checkVariables(inputParams =params$comparisons , 
+                                dfDesign = design, variables= var2check)
+  if (checkVar_res$status==1){
+  	stop(checkVar_res$error)
+  }
 
   #  params$wildstr_run
   
@@ -491,6 +499,8 @@ if (all(params$confounder_list != '')) {
        list_numeric <- append(list_numeric, col)
      }  
   }
+
+  if (length(list_numeric) != 0) {
   
   cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
 
@@ -500,14 +510,14 @@ if (all(params$confounder_list != '')) {
                boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
       invisible(dev.off())
-      
+  } 
   
   for (col_ch in unlist(list_character)){
     #log_info(col_ch)
-    boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    boxplot_ch<- ggplot(cData, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
           pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch_confounder.pdf')),paper="a4")
-         boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+         boxplot_ch<- ggplot(cData, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)  
      
       invisible(dev.off())
@@ -647,7 +657,12 @@ pe <- msqrob(object = pe, i = "proteinRS",
 
 
 contrast_list <- paste0(params$comparisons, "=0")
-coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+
+## to be removed 
+#coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+## coef from the model itself
+coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
+
 
 L <- makeContrast(contrast_list, parameterNames = coef)
 
@@ -673,8 +688,11 @@ saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
   dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
+
 for (a in params$comparisons){
-  dir.create(file.path(params$folder_prj,"Result","Contrast",a), recursive = TRUE)
+  log_info(a)
+  log_info(check_and_substitute_forbidden_chars(a))
+  dir.create(file.path(params$folder_prj,"Result","Contrast",check_and_substitute_forbidden_chars(a)), recursive = TRUE,showWarnings = TRUE)
 }
 
 
@@ -693,7 +711,7 @@ for (a in params$comparisons){
     render_child(data = test[[cmp]], 
                  pe =pe , 
                  label= cmp ,
-                 path=file.path(params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
+                 path=file.path(params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
@@ -720,7 +738,7 @@ log_info('Running Analysis for each comparison..')
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp , 
-                 path=file.path(params$folder_prj, "Result","Contrast",cmp),  
+                 path=file.path(params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),  
                  template='_templateContrast.Rmd') 
     cat('\n\n')
     
@@ -735,7 +753,7 @@ log_info('Running Analysis for each comparison..')
                    pe = pe,
                    sample_rel = filt_val,
                  label = cmp,
-                 path= file.path(  params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path(  params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),
                  template='_templateHeatMap.Rmd')
     }
     cat('\n\n')
@@ -746,7 +764,7 @@ log_info('Running Analysis for each comparison..')
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp,
-                 path= file.path( params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path( params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),
                  template='_templateBarPlot.Rmd')
     cat('\n\n')
     
