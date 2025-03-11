@@ -59,15 +59,14 @@ check_DIANN_report <- function  (data_ , q_feature){
   #' @return type_raw: format file of the raw file detected ,
   #' @error error: error message
  
-check_design_data  <- function  (data_ , design){
+check_design_data  <- function  (data_ , design, min_featues){
   status <- 0
   #type_raw <- NA
   error <-
     
   data_sample <- colnames(data_)[10:length(colnames(data_))]
 
- min_col_need_design <- c("sample","run", "group", "replicate") 
-  if  ( ! all( min_col_need_design %in% colnames(design)) == TRUE){
+  if  ( ! all( min_featues %in% colnames(design)) == TRUE){
     #cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' )  
     #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
     error <-  capture.output(cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' ))
@@ -103,7 +102,7 @@ check_length_design_data  <- function  (data_ , design){
   
   data_sample <- colnames(data_)[10:length(colnames(data_))]
   ## filename does not exist 
-  d_sample <- design %>% dplyr::select(run) %>% pull()
+  d_sample <- design %>% dplyr::select(Run) %>% pull()
   
   
   if (length(data_sample) < length(d_sample)){
@@ -622,23 +621,25 @@ theme_custom_vis <- function(base_size = 12) {
 ######------generate_pca_plots--------------------------------------------
 #' @author Andrea Argentini
 #' generate_pca_plots
-#' This function generate PCA plots from a list of cofounder or variables 
-#' included in the colData informationof the Q-features object.
+#' This function generate PCA plots from a list of confounder or variables 
+#' included in the colData information of the Q-features object.
 #' It is allowed only two variable per plot (shape and color), and the valid 
 #' combination of variable types are: 
 #' - Character | Factor and  Character | Factor (e.g Group-timepoints)
 #' - Numerical  and   Character | Factor  (e.g Group-BMI)
-#' -  Character | Factor (single variable) (e.g Group, Replicates)
+#' - Character | Factor (single variable) (e.g Group, Replicates)
+#' ggplots generated are returned in a list , and printed in PDF inside the function
 #' @param var_topca List of variables to use it color/shape samples in the PCA plots
 #' @param pe Q-features object
 #' @param params List  of the current run
 #' @param layer Layer of the Q-features object to use for the PCA 
-#' @return None  plots both on the device and on file in PDF format
+#' @return output_plot List of ggplots generated for plotly visualization
 
 generate_pca_plots <- function(var_topca, pe, params, layer) {
   # Define a fixed color palette
-  
-  for (v in var_topca) {
+  output_plot<- list()
+  for (i in seq_along(var_topca)) { # Iterate using index
+    v <- var_topca[i] # Access element by index
     log_info(v)
     
     comparisonPCA <- unlist(strsplit(var_topca[var_topca == v], '-', fixed = TRUE))
@@ -651,17 +652,22 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
     
     if (length(comparisonPCA) == 1) {
       # Handle single variable case
+      log_info('PCA single variable')
       single_comp <- comparisonPCA[1]
       log_info(single_comp)
       
-      pca_ <- ggplot(data = prcompPe$x) +
+      pca_ <- ggplot(data = data.frame(prcompPe$x, SampleName= colData(pe)[['SampleName']],
+                                       single_comp = colData(pe)[[single_comp]])  ) +
         ggtitle(paste0("PCA by ", v)) +
-        geom_point(aes(x = PC1, y = PC2, colour = factor(colData(pe)[[single_comp]])), size = 3) +
+       
+        geom_point(aes(x = PC1, y = PC2, colour = factor(single_comp),
+                                   text = paste("Sample:", SampleName)), size = 3 ) +
         xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
         ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
         labs(colour = single_comp)
       
-      plot(pca_)
+      #plot(pca_)
+      output_plot[[i]] <- pca_ # Assign plot to list element
       
       log_info(file.path(params$folder_prj, "Result"))
       pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
@@ -673,22 +679,26 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
       # Handle two variables case
       first_comp <- comparisonPCA[1]
       second_comp <- comparisonPCA[2]
-      log_info('Same type of variable')
+      log_info('2 variable -> Same type ')
       
       
       if (class(colData(pe)[[first_comp]]) == class(colData(pe)[[second_comp]])) {
         # Both variables are of the same type
         if (is.character(colData(pe)[[first_comp]]) | is.factor(colData(pe)[[first_comp]])  ) {
           # Both are character variables
-          pca_ <- ggplot(data = prcompPe$x) +
+          pca_ <- ggplot(data = data.frame(prcompPe$x,SampleName= colData(pe)[['SampleName']],
+                                           first_comp = colData(pe)[[first_comp]],
+                                           second_comp = colData(pe)[[second_comp]]
+                                           )) +
             ggtitle(paste0("PCA by ", v)) +
-            geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[first_comp]], shape = colData(pe)[[second_comp]]), size = 3) +
+            geom_point(aes(x = PC1, y = PC2, colour = factor(first_comp), shape = factor(second_comp),
+                           text = paste("Sample:",SampleName)), size = 3) +
             xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
             ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
             labs(colour = first_comp, shape = second_comp)
           
-          plot(pca_)
-          
+          output_plot[[i]] <- pca_ # Assign plot to list element
+         
           
           log_info(file.path(params$folder_prj, "Result"))
           pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
@@ -712,14 +722,20 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
         log_info(paste0("numerical ", num_comp))
         log_info(paste0("categorical ", chr_comp))
         
-        pca_ <- ggplot(data = prcompPe$x) +
+        pca_ <- ggplot(data = data.frame(prcompPe$x,SampleName= colData(pe)[['SampleName']],
+                                         num_comp = colData(pe)[[num_comp]],
+                                         chr_comp = colData(pe)[[chr_comp]]
+                       )) +
           ggtitle(paste0("PCA by ", v)) +
-          geom_point(aes(x = PC1, y = PC2, colour = colData(pe)[[num_comp]], shape = factor(colData(pe)[[chr_comp]])), size = 3) +
+          geom_point(aes(x = PC1, y = PC2, colour = num_comp, 
+                         shape = factor(chr_comp),
+                         text = paste("Sample:", SampleName )), size = 3 ) +
           xlab(paste("PC1", percent(summary(prcompPe)$importance[,"PC1"][[2]], accuracy = 0.1))) +
           ylab(paste("PC2", percent(summary(prcompPe)$importance[,"PC2"][[2]], accuracy = 0.1))) +
           labs(colour = num_comp, shape = chr_comp)
         
-        plot(pca_)
+        #plot(pca_)
+        output_plot[[i]] <- pca_ # Assign plot to list element
         
         log_info(file.path(params$folder_prj, "Result"))
         pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
@@ -729,6 +745,7 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
       }
     }
   }
+  return (output_plot)
 }
 ##-----------check_and_substitute_forbidden_chars--------------
 #' @author Andrea Argentini

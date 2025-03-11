@@ -172,7 +172,7 @@ if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
- min_col_need_design <- c("sample","run", "group", "replicate","filename")
+ min_col_need_design <- c("Sample","Run", "Group", "Replicate")
 
  
  
@@ -235,7 +235,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   
 
  
-  result_check <- check_design_data(dfMsqrob,design) 
+  result_check <- check_design_data(dfMsqrob,design, min_featues =  min_col_need_design) 
   
   if (result_check$status == 1  ){
     stop(result_check$error)
@@ -267,8 +267,8 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   # if (check_groups$status == 1){
   #     stop(check_groups$error)
   # }
-
-  var2check <- 'group'
+  # 'Group' as in the metadata file
+  var2check <- 'Group'
   var2check <- append(var2check,params$confounder_list)
   checkVar_res <-checkVariables(inputParams =params$comparisons , 
                                 dfDesign = design, variables= var2check)
@@ -283,13 +283,13 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     ) 
     
  
-  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
+  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
   # debugging
   # names(a_wide)[str_which(names(a_wide), paste0('\\','CMB-'))] <- samplenames$sample
   # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
 
 
-  names(dfMsqrob)[str_which(names(dfMsqrob),  'CMB-' ) ] <- samplenames$sample
+  names(dfMsqrob)[str_which(names(dfMsqrob),  'CMB-' ) ] <- samplenames$Sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
@@ -310,14 +310,14 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 
 ## really important arrange w.r.t to the samplesnames$sample to preserve the right order
 
-design <- design %>%  arrange(factor(sample, levels = samplenames$sample))
+design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
 
-colData(pe)$Group <- factor(design$group)
-colData(pe)$SampleName <- design$sample
+colData(pe)$Group <- factor(design$Group)
+colData(pe)$SampleName <- design$Sample
 
 #group column from design is now Group in coData(pe)
 
-colData(pe)$Replicate <- factor(design$replicate)
+colData(pe)$Replicate <- factor(design$Replicate)
 
 
 custom_col <- setdiff(colnames(design),min_col_need_design )
@@ -356,8 +356,8 @@ rowData(pe[["precursor"]])$pep_per_prot <-
               summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
 
 ## add statistics per group 
-group_val <- design %>% distinct(group) %>%  pull()
- group_size <- design  %>% group_by(group) %>% summarise(n_=n()) %>% pull(n_)
+group_val <- design %>% distinct(Group) %>%  pull()
+ group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% pull(n_)
 names(group_size) <- group_val
 
 for ( v in group_val){
@@ -637,12 +637,25 @@ log_info('Completness Analysis...')
 ## PCA
 
 ```{r pca_plot}
+#| results: asis
 
 # to do make in for loop for a set of variable
 log_info('PCA Analysis...')
 var_topca <- params$PCA_comparison
 
-generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
+l_pca <- generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
+if (length(l_pca) == 0){
+  stop('Error during PCA generation ')
+}
+#ggplotly(  l_pca[[1]])
+
+#htmltools::tagList(l_pca)
+# saveRDS(l_pca, 'pcaPlot.Rds')
+ for (pca_plot in l_pca ){
+   
+  print(htmltools::tagList(ggplotly(pca_plot)))
+   #ggplotly(pca_plot)
+ }
 
 ```
 
