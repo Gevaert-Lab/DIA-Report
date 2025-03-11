@@ -269,7 +269,10 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   # }
   # 'Group' as in the metadata file
   var2check <- 'Group'
-  var2check <- append(var2check,params$confounder_list)
+  if (params$confounder_list != '' ){
+      var2check <- append(var2check,params$confounder_list)
+  }  
+  
   checkVar_res <-checkVariables(inputParams =params$comparisons , 
                                 dfDesign = design, variables= var2check)
   if (checkVar_res$status==1){

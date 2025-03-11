@@ -48,10 +48,8 @@ check_DIANN_report <- function  (data_ , q_feature){
   ######------check_design_data-----------------------------------------------------
   #' @author Andrea Argentini
   #' check_design_data
-  #' This function checks some main sanity controls for the data retrieved in DIA 
-  #' report and in experiment design file 
-  #'Remark : Model result are supposed to be in proteinRS layer.
-  #' 
+  #'This function checks some main sanity controls in the design file 
+  #' e.g. Name of columns, min available columns.
   #' @param data_: data frame containing the DIA-NN report data
   #' @param design: data frame containing experiment design data 
   #'
@@ -489,8 +487,15 @@ check_dependencies = function(required_packages = required_packages){
 }
 
 
-
-### TOBEcheched!!checkVariables!!! ------------------
+###----------checkVariables!!! ------------------
+#' @author Andrea Argentini
+#' checkVariables
+#' This function implement sanity check related if the values are correct with respect 
+#' to the design file and its confounder values. 
+#' @param inputParams: comparisons groups in input parameter list 
+#' @param dfDesign: data frame containing experiment design data 
+#' @param variables: data frame containing experiment design data 
+#' @return status : int 0 / 1 error message  
 checkVariables <- function(inputParams, dfDesign, variables) {
   # Initialize lists to collect status and errors
   statusList <- list()
