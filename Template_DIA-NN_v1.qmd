@@ -49,6 +49,7 @@ params:
   mbr: FALSE
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
+  keep_design_order: FALSE
 ---
 
 <!-- <style> -->
@@ -292,10 +293,18 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
 
 
-  names(dfMsqrob)[str_which(names(dfMsqrob),  'CMB-' ) ] <- samplenames$Sample
+  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
+  
+  if (params$keep_design_order == TRUE) {
+      ## order sample to follow the original design file order
+  dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
+  }
+  
+
+
 
 ```
 
@@ -311,10 +320,16 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
                      name = "precursor")
 
 
-## really important arrange w.r.t to the samplesnames$sample to preserve the right order
 
-design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
 
+   # if keep_design_order == fALSe
+ # really important arrange w.r.t to the samplesnames$sample to preserve the right order
+
+  if (params$keep_design_order == FALSE) {
+    design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
+
+  }
+ 
 colData(pe)$Group <- factor(design$Group)
 colData(pe)$SampleName <- design$Sample
 
