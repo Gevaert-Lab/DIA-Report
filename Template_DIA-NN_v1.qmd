@@ -406,7 +406,6 @@ size <- dim(colData(pe))[1]
 
 ## filtering per group
 
-
   if (params$filtPerGroup) {
       log_info('filtering per group')
     
@@ -475,6 +474,9 @@ for ( v in group_val){
     rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
 }
 
+
+
+
 ```
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
 
@@ -494,7 +496,6 @@ if ( ! params$ensembl_annotation == ''){
      rowData(pe[['proteinRS']])[[ann_col]] <- app[[ann_col]]
   }
  
-
 }
 
 ```
