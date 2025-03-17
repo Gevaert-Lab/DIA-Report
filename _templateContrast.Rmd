@@ -51,8 +51,21 @@ if ( UP > 1 | DOWN > 1   ) {
 
      final <- c(d_l,u_l)
      
-     sample_sel <- c(rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[1],] ),
-          rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[2],])  ) 
+     #sample_sel <- c(rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[1],] ),
+     #      rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[2],])  ) 
+     
+     
+      #extracted_values <- split_extract_values(label, params$contrast)
+
+
+     contrast_values_paresed <- split_and_check_values(label, params$contrast, pe)
+     log_info(contrast_values_paresed$Aleft$Group)
+     log_info(contrast_values_paresed$Aleft$Timepoint)
+
+     sample_sel <- select_samples(contrast_values_paresed, pe , params$contrast)
+
+
+     log_info(length(sample_sel))
 
    ab <- as.data.frame(assay(pe[["proteinRS"]])[final,sample_sel])
 

@@ -10,9 +10,9 @@ log_info('Heatmap Visual for proteins ...')
 
 selected <- data$toptable %>% filter(differential_expressed %in% c('UP','DOWN'))  %>% pull(Uniprot_id)
 
-app <- as.data.frame(colData(pe)) %>% filter( Group %in% sample_rel)%>% arrange(Group) %>% dplyr::select(- SampleName)  
+#app <- as.data.frame(colData(pe)) %>% filter( Group %in% sample_rel)%>% arrange(Group) %>% dplyr::select(- SampleName)  
 
-data <-  assay(pe[["proteinRS"]])[selected,rownames(app)]
+data <-  assay(pe[["proteinRS"]])[selected,sample_rel]
 
 log_info(dim(data)[1])
 log_info(dim(data)[2])

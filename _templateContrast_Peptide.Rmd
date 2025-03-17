@@ -55,12 +55,15 @@ if ( UP > 0 | DOWN > 0   ) {
 
      
    final <- c(d_l,u_l)
-   ## logging info to print list 
-   #log_info("{paste(final, collapse = ', ')}")
-            
-   sample_sel <- c(rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[1],] ),
-          rownames(colData(pe)[colData(pe)$Group == str_split_fixed(label_work,' - ',n=2)[2],])  ) 
-  
+   
+   contrast_values_paresed <- split_and_check_values(label, params$contrast, pe)
+     log_info(contrast_values_paresed$Aleft$Group)
+     log_info(contrast_values_paresed$Aleft$Timepoint)
+
+     sample_sel <- select_samples(contrast_values_paresed, pe , params$contrast)
+
+
+     log_info(length(sample_sel))
    
     ab <- as.data.frame(assay(pe[["peptideNorm"]])[final,sample_sel])
    

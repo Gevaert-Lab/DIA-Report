@@ -770,3 +770,108 @@ check_and_substitute_forbidden_chars <- function(input_string) {
   
   return(input_string)
 }
+
+##-----------check_and_substitute_forbidden_chars--------------
+#' @author Andrea Argentini
+#' check_and_substitute_forbidden_chars
+#' This function  split strings and extract variable values
+#' @param input_string input string with possible 
+#' @param variable_names list of the variable name in the formula
+#' @return outputstr_chr_removed  output string
+split_and_check_values <- function(input_string, variable_names, pe) {
+  # Check if variable_names is empty
+  if (length(variable_names) == 0 || (length(variable_names) == 1 && variable_names == '')) {
+    stop("The variable_names vector is empty.")
+  }
+  
+  # Split the string by '-'
+  split_strings <- strsplit(input_string, " - ")[[1]]
+  
+  # Check if the split resulted in two parts
+  if (length(split_strings) != 2) {
+    stop("Input string does not contain exactly one '-' separator.")
+  }
+  
+  # Extract substrings A and B
+  A <- trimws(split_strings[1]) # Remove leading and trailing whitespaces
+  B <- trimws(split_strings[2]) # Remove leading and trailing whitespaces
+  
+  # Check if either A or B is empty
+  if (A == "" || B == "") {
+    stop("One of the left or right substrings is empty.")
+  }
+  
+  # Function to check if values belong to colData(pe)
+  check_values <- function(sub_string, variable_names, pe) {
+    # Split the substring by '+'
+    terms <- strsplit(sub_string, " \\+ ")[[1]]
+    values <- list()
+    
+    for (variable in variable_names) {
+      values[[variable]] <- c() # Initialize an empty vector for the variable
+      
+      for (term in terms) {
+        
+        if (length(term) > 0) {
+          # Check if the value belongs to colData(pe)
+          if (term %in% colData(pe)[[variable]]) {
+            values[[variable]] <- c(values[[variable]], term)
+          }
+        }
+      }
+      
+      # If no valid value found, set it to NA
+      if (length(values[[variable]]) == 0) {
+        values[[variable]] <- NA
+      }
+    }
+    values
+  }
+  
+  # Check values from A and B
+  values_A <- check_values(A, variable_names, pe)
+  values_B <- check_values(B, variable_names, pe)
+  
+  # Return the checked values as a list
+  list(Aleft = values_A, Bright = values_B)
+}
+
+
+
+
+
+select_samples <- function(test_parsing, pe, variable_names) {
+  sample_sel <- character(0)  # Initialize as character vector
+  
+  # Helper function to get samples for a given term (Aleft or Bright)
+  get_samples <- function(term, pe, variable_names) {
+    # Check if variable_names is valid
+    if (is.null(variable_names) || length(variable_names) == 0) {
+      return(character(0)) # Return empty character vector if variable_names is missing or empty
+    }
+    
+    # Create a logical vector to store the combined conditions
+    condition <- rep(TRUE, nrow(colData(pe)))
+    
+    # Iterate over each variable name and add the condition
+    for (variable in variable_names) {
+      if (is.null(term[[variable]]) || is.na(term[[variable]])) {
+        return(character(0)) # Return empty character vector if variable is missing or NA in the term
+      }
+      condition <- condition & (colData(pe)[[variable]] == term[[variable]])
+    }
+    
+    # Select samples that match all conditions
+    samples <- rownames(colData(pe)[condition, , drop = FALSE])
+    return(samples)
+  }
+  
+  # Get samples for Aleft and Bright
+  samples_A <- get_samples(test_parsing$Aleft, pe, variable_names)
+  samples_B <- get_samples(test_parsing$Bright, pe, variable_names)
+  
+  # Combine the samples and return unique values
+  sample_sel <- unique(c(samples_A, samples_B))
+  
+  return(sample_sel)
+}

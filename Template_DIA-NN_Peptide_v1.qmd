@@ -53,6 +53,7 @@ params:
   mbr: FALSE
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
+  comparison_label: ""
 ---
 
 <!-- <style> -->
@@ -140,9 +141,16 @@ log_formatter(formatter_data_frame)
 log_formatter(formatter_glue)
 
 
+is_empty <- function(contrast) {
+  return(length(contrast) == 0 || (length(contrast) == 1 && contrast == ''))
+}
 
-if (params$contrast == '' ){
+if(is_empty(params$contrast) ){
   stop("Check parameter file: contrast is not set" )
+}
+
+if (all(params$comparison_label == '') ){
+  stop("Check parameter file: comparisons label is not set" )
 }
 
 if (all(params$comparisons == '') ){
@@ -705,15 +713,15 @@ saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experimens.Rds"
 test <-  lapply(params$comparisons, DEP_volcano_peptide, data= pe,  p=params )
 
 
-names(test) <- params$comparisons 
-
+#names(test) <- params$comparisons 
+names(test) <-  params$comparison_label
 
 
 
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
   dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
-for (a in params$comparisons){ 
+for (a in params$comparison_label){ 
   log_info(a) 
   log_info(check_and_substitute_forbidden_chars(a)) 
   dir.create(file.path(params$folder_prj,"Result","Contrast",check_and_substitute_forbidden_chars(a)), recursive = TRUE,showWarnings = TRUE) 
@@ -770,6 +778,10 @@ log_info('Running Analysis for each comparison..')
       cat(' Not Significant proteins to be visualized in in the  heatmap \n')
     }else{
   
+       contrast_values_paresed <- split_and_check_values(cmp, params$contrast,pe)
+
+       filt_val <- select_samples(contrast_values_paresed, pe , params$contrast)
+   
       render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,
                  label = cmp, 

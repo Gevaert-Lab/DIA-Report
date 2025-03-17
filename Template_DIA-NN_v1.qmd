@@ -50,6 +50,7 @@ params:
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
   keep_design_order: FALSE
+  comparison_label: ""
 ---
 
 <!-- <style> -->
@@ -132,8 +133,18 @@ formatter_data_frame <- function(df, ...) {
 log_formatter(formatter_data_frame)
 log_formatter(formatter_glue)
 
-if (params$contrast == '' ){
+## 
+is_empty <- function(contrast) {
+  return(length(contrast) == 0 || (length(contrast) == 1 && contrast == ''))
+}
+
+if(is_empty(params$contrast) ){
   stop("Check parameter file: contrast is not set" )
+}
+
+
+if (all(params$comparison_label == '') ){
+  stop("Check parameter file: comparisons label is not set" )
 }
 
 if (all(params$comparisons == '') ){
@@ -582,7 +593,9 @@ peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  ) +   ggtitle("Missingness - precursor level" )
+  ) +   ggtitle("Missingness - Precursor level" )
+
+#peptidemissingness
 
 proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   xlab("Protein index (ordered by data completeness)") +
@@ -591,8 +604,8 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  ) +   ggtitle("Missingness - protein level")
-
+  ) +   ggtitle("Missingness - Protein Level")
+#proteinmissingness
 #missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
 #print(missingness)
 
@@ -710,8 +723,8 @@ pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE
 
 test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
 
-
-names(test) <- params$comparisons 
+# params$comparison
+names(test) <-  params$comparison_label
 
 log_info('Saving pe object (qfeatures) as Rds file.')
 saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"))
@@ -720,8 +733,8 @@ saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
   dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
-
-for (a in params$comparisons){
+# old one params$comparisons
+for (a in   params$comparison_label ){
   log_info(a)
   log_info(check_and_substitute_forbidden_chars(a))
   dir.create(file.path(params$folder_prj,"Result","Contrast",check_and_substitute_forbidden_chars(a)), recursive = TRUE,showWarnings = TRUE)
@@ -738,7 +751,8 @@ for (a in params$comparisons){
 #| results: asis
   for (cmp in names(test)) {
     cmp_label <- gsub(params$contrast,'',cmp )
-    cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
+    cat( '##', paste(cmp_label,' P-values distribution 
+                     ',sep=' '), '\n\n')
     
     render_child(data = test[[cmp]], 
                  pe =pe , 
@@ -774,14 +788,21 @@ log_info('Running Analysis for each comparison..')
                  template='_templateContrast.Rmd') 
     cat('\n\n')
     
-    filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
-    #print(filt_val)
+   
 
     if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
       cat(' Not enough DE proteins for heatmap visualization \n')
     }else{
+      
+    #filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
+    #print(filt_val)
     
-      render_child(data = test[[cmp]],
+    contrast_values_paresed <- split_and_check_values(cmp, params$contrast,pe)
+    
+
+   filt_val <- select_samples(contrast_values_paresed, pe , params$contrast)
+    
+    render_child(data = test[[cmp]],
                    pe = pe,
                    sample_rel = filt_val,
                  label = cmp,
