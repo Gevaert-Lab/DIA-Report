@@ -267,7 +267,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   }
   
   ## first check confounders in design file
-  if (all(params$confounder_list != '')) {
+  if ( ! is_empty(params$confounder_list)  ) {
     check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
         stop(check_confounder_list$error)
@@ -281,7 +281,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   # }
   # 'Group' as in the metadata file
   var2check <- 'Group'
-  if (params$confounder_list != '' ){
+  if (! is_empty(params$confounder_list) ){
       var2check <- append(var2check,params$confounder_list)
   }  
   
@@ -518,7 +518,7 @@ cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
 
-if (all(params$confounder_list != '')) {
+if ( ! is_empty(params$confounder_list) ) {
   for  (col in params$confounder_list){
      if  (is.factor (cData[[col]])) {
        #log_info(paste0('Character - ', col))
@@ -532,7 +532,7 @@ if (all(params$confounder_list != '')) {
 
   if (length(list_numeric) != 0) {
   
-  cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
+    cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
@@ -703,10 +703,24 @@ pe <- msqrob(object = pe, i = "proteinRS",
 
 contrast_list <- paste0(params$comparisons, "=0")
 
+
+coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
+
+    if (is.null(coef)) {
+          coef <- rowData(pe[["proteinRS"]])$msqrobModels[[2]] %>% getCoef %>% names
+           #  log_info(getCoef(rowData(pe[['ptmRel']])$msqrobModels[[1]]))
+          getCoef(rowData(pe[['proteinRS']])$msqrobModels[[2]])
+
+
+    }else{
+      getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
+
+    }
+
 ## to be removed 
 #coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
 ## coef from the model itself
-coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
+#coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
 
 
 L <- makeContrast(contrast_list, parameterNames = coef)
@@ -715,10 +729,8 @@ L <- makeContrast(contrast_list, parameterNames = coef)
 # rownames(L) <- paste0("ridge",rownames(L))
 
 
-getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
 
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
-
 
 
 test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )

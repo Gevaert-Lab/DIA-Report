@@ -1,5 +1,5 @@
 
-```{r peptide_contras}
+```{r}
 
 log_info('Inside Contrast Visual for Peptide.... ')
 
@@ -67,7 +67,13 @@ if ( UP > 0 | DOWN > 0   ) {
    
     ab <- as.data.frame(assay(pe[["peptideNorm"]])[final,sample_sel])
    
-    
+   # In case you have more than one variable e.G interaction analysis 
+   # we take the first one.
+   if (length(params$contrast) > 1) {
+        values_2col <- params$contrast[1]
+      }else{
+        values_2col <- params$contrast
+      }
     
   ann <-  data$toptable  %>%   filter ( precursor_id  %in% final ) %>% dplyr::select(precursor_id  ,logFC,adjPval) %>%  mutate( Peptide_info=  str_wrap( paste(precursor_id,'\n','LogFC:',round(logFC,2),'adjPval',format(adjPval,scientific= TRUE) ,sep=' '),width= 15)  ) %>% dplyr::select(  -adjPval)
   
@@ -76,7 +82,7 @@ if ( UP > 0 | DOWN > 0   ) {
     
    
      dep_plot_crip <- ab %>%
-  ggplot( aes(x=Group, y=Intensity, fill=Group )) +
+  ggplot( aes(x=.data[[values_2col]], y=Intensity, fill=.data[[values_2col]] )) +
     geom_boxplot() +
     scale_fill_manual( values= c( "#6d0286", "#35B779FF") ) +
     geom_jitter(color="black", size=1, alpha=0.8)  +
