@@ -49,6 +49,8 @@ params:
   mbr: FALSE
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
+  keep_design_order: FALSE
+  comparison_label: ""
 ---
 
 <!-- <style> -->
@@ -131,8 +133,18 @@ formatter_data_frame <- function(df, ...) {
 log_formatter(formatter_data_frame)
 log_formatter(formatter_glue)
 
-if (params$contrast == '' ){
+## 
+is_empty <- function(contrast) {
+  return(length(contrast) == 0 || (length(contrast) == 1 && contrast == ''))
+}
+
+if(is_empty(params$contrast) ){
   stop("Check parameter file: contrast is not set" )
+}
+
+
+if (all(params$comparison_label == '') ){
+  stop("Check parameter file: comparisons label is not set" )
 }
 
 if (all(params$comparisons == '') ){
@@ -172,7 +184,7 @@ if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
- min_col_need_design <- c("sample","run", "group", "replicate","filename")
+ min_col_need_design <- c("Sample","Run", "Group", "Replicate")
 
  
  
@@ -235,7 +247,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   
 
  
-  result_check <- check_design_data(dfMsqrob,design) 
+  result_check <- check_design_data(dfMsqrob,design, min_featues =  min_col_need_design) 
   
   if (result_check$status == 1  ){
     stop(result_check$error)
@@ -254,19 +266,30 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   #checkLength$message
   }
   
-  
-  check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-  if (check_groups$status == 1){
-      stop(check_groups$error)
-  }  
-
-  if (all(params$confounder_list != '')) {
+  ## first check confounders in design file
+  if ( ! is_empty(params$confounder_list)  ) {
     check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
         stop(check_confounder_list$error)
     }
   }
-
+  
+  ## Simple version   
+  # check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
+  # if (check_groups$status == 1){
+  #     stop(check_groups$error)
+  # }
+  # 'Group' as in the metadata file
+  var2check <- 'Group'
+  if (! is_empty(params$confounder_list) ){
+      var2check <- append(var2check,params$confounder_list)
+  }  
+  
+  checkVar_res <-checkVariables(inputParams =params$comparisons , 
+                                dfDesign = design, variables= var2check)
+  if (checkVar_res$status==1){
+  	stop(checkVar_res$error)
+  }
 
   #  params$wildstr_run
   
@@ -275,16 +298,24 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     ) 
     
  
-  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(run, sample) , join_by(base_name_sample ==  run) )
+  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
   # debugging
   # names(a_wide)[str_which(names(a_wide), paste0('\\','CMB-'))] <- samplenames$sample
   # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
 
 
-  names(dfMsqrob)[str_which(names(dfMsqrob),  'CMB-' ) ] <- samplenames$sample
+  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
  
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
+  
+  if (params$keep_design_order == TRUE) {
+      ## order sample to follow the original design file order
+  dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
+  }
+  
+
+
 
 ```
 
@@ -300,16 +331,22 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
                      name = "precursor")
 
 
-## really important arrange w.r.t to the samplesnames$sample to preserve the right order
 
-design <- design %>%  arrange(factor(sample, levels = samplenames$sample))
 
-colData(pe)$Group <- factor(design$group)
-colData(pe)$SampleName <- design$sample
+   # if keep_design_order == fALSe
+ # really important arrange w.r.t to the samplesnames$sample to preserve the right order
+
+  if (params$keep_design_order == FALSE) {
+    design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
+
+  }
+ 
+colData(pe)$Group <- factor(design$Group)
+colData(pe)$SampleName <- design$Sample
 
 #group column from design is now Group in coData(pe)
 
-colData(pe)$Replicate <- factor(design$replicate)
+colData(pe)$Replicate <- factor(design$Replicate)
 
 
 custom_col <- setdiff(colnames(design),min_col_need_design )
@@ -348,8 +385,8 @@ rowData(pe[["precursor"]])$pep_per_prot <-
               summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
 
 ## add statistics per group 
-group_val <- design %>% distinct(group) %>%  pull()
- group_size <- design  %>% group_by(group) %>% summarise(n_=n()) %>% pull(n_)
+group_val <- design %>% distinct(Group) %>%  pull()
+ group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% pull(n_)
 names(group_size) <- group_val
 
 for ( v in group_val){
@@ -379,7 +416,6 @@ The filtering steps applied are:
 size <- dim(colData(pe))[1]
 
 ## filtering per group
-
 
   if (params$filtPerGroup) {
       log_info('filtering per group')
@@ -449,6 +485,9 @@ for ( v in group_val){
     rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
 }
 
+
+
+
 ```
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
 
@@ -468,7 +507,6 @@ if ( ! params$ensembl_annotation == ''){
      rowData(pe[['proteinRS']])[[ann_col]] <- app[[ann_col]]
   }
  
-
 }
 
 ```
@@ -480,7 +518,7 @@ cData<-as.data.frame(colData(pe))
 list_numeric <- list()
 list_character <- list()
 
-if (all(params$confounder_list != '')) {
+if ( ! is_empty(params$confounder_list) ) {
   for  (col in params$confounder_list){
      if  (is.factor (cData[[col]])) {
        #log_info(paste0('Character - ', col))
@@ -491,8 +529,10 @@ if (all(params$confounder_list != '')) {
        list_numeric <- append(list_numeric, col)
      }  
   }
+
+  if (length(list_numeric) != 0) {
   
-  cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
+    cData_n<-cData%>%pivot_longer(cols=unlist(list_numeric), names_to="Numeric_Variables", values_to="Value")
 
 		           boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
@@ -500,14 +540,14 @@ if (all(params$confounder_list != '')) {
                boxplot_num <-ggplot(cData_n, aes(x=Numeric_Variables, y=Value, fill=Group))+geom_boxplot()
   print(boxplot_num)
       invisible(dev.off())
-      
+  } 
   
   for (col_ch in unlist(list_character)){
     #log_info(col_ch)
-    boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+    boxplot_ch<- ggplot(cData, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)
           pdf(file= file.path(params$folder_prj,"Result",paste0('Boxplot_ch_confounder.pdf')),paper="a4")
-         boxplot_ch<- ggplot(cData_n, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
+         boxplot_ch<- ggplot(cData, aes(x={{col_ch}}, fill=Group))+geom_bar()+ggtitle( {{col_ch}} )
     print(boxplot_ch)  
      
       invisible(dev.off())
@@ -553,7 +593,9 @@ peptidemissingness <- MSnbase::plotNA(assay(pe[["precursorNorm"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  ) +   ggtitle("Missingness - precursor level" )
+  ) +   ggtitle("Missingness - Precursor level" )
+
+#peptidemissingness
 
 proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   xlab("Protein index (ordered by data completeness)") +
@@ -562,8 +604,8 @@ proteinmissingness <- MSnbase::plotNA(assay(pe[["proteinRS"]])) +
   theme(strip.text.x = element_blank(),
         strip.background = element_rect(colour="white", fill="white"),
         legend.position=c(.35,.15)
-  ) +   ggtitle("Missingness - protein level")
-
+  ) +   ggtitle("Missingness - Protein Level")
+#proteinmissingness
 #missingness <- gridExtra::grid.arrange(peptidemissingness, proteinmissingness, nrow = 1)
 #print(missingness)
 
@@ -627,12 +669,25 @@ log_info('Completness Analysis...')
 ## PCA
 
 ```{r pca_plot}
+#| results: asis
 
 # to do make in for loop for a set of variable
 log_info('PCA Analysis...')
 var_topca <- params$PCA_comparison
 
-generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
+l_pca <- generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
+if (length(l_pca) == 0){
+  stop('Error during PCA generation ')
+}
+#ggplotly(  l_pca[[1]])
+
+#htmltools::tagList(l_pca)
+# saveRDS(l_pca, 'pcaPlot.Rds')
+ for (pca_plot in l_pca ){
+   
+  print(htmltools::tagList(ggplotly(pca_plot)))
+   #ggplotly(pca_plot)
+ }
 
 ```
 
@@ -647,7 +702,26 @@ pe <- msqrob(object = pe, i = "proteinRS",
 
 
 contrast_list <- paste0(params$comparisons, "=0")
-coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+
+
+coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
+
+    if (is.null(coef)) {
+          coef <- rowData(pe[["proteinRS"]])$msqrobModels[[2]] %>% getCoef %>% names
+           #  log_info(getCoef(rowData(pe[['ptmRel']])$msqrobModels[[1]]))
+          getCoef(rowData(pe[['proteinRS']])$msqrobModels[[2]])
+
+
+    }else{
+      getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
+
+    }
+
+## to be removed 
+#coef <-  unique(unlist(strsplit(params$comparisons,' - ',fixed=T)))
+## coef from the model itself
+#coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
+
 
 L <- makeContrast(contrast_list, parameterNames = coef)
 
@@ -655,16 +729,14 @@ L <- makeContrast(contrast_list, parameterNames = coef)
 # rownames(L) <- paste0("ridge",rownames(L))
 
 
-getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
 
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
 
 
+test <-  lapply(params$comparisons, dep_volcano, data= pe,  p=params )
 
-test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
-
-
-names(test) <- params$comparisons 
+# params$comparison
+names(test) <-  params$comparison_label
 
 log_info('Saving pe object (qfeatures) as Rds file.')
 saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"))
@@ -673,8 +745,11 @@ saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experiment.Rds"
 if (!dir.exists(file.path(params$folder_prj, "Result","Contrast"))){
   dir.create(file.path( params$folder_prj, "Result","Contrast"), recursive = TRUE)
 }
-for (a in params$comparisons){
-  dir.create(file.path(params$folder_prj,"Result","Contrast",a), recursive = TRUE)
+# old one params$comparisons
+for (a in   params$comparison_label ){
+  log_info(a)
+  log_info(check_and_substitute_forbidden_chars(a))
+  dir.create(file.path(params$folder_prj,"Result","Contrast",check_and_substitute_forbidden_chars(a)), recursive = TRUE,showWarnings = TRUE)
 }
 
 
@@ -688,12 +763,13 @@ for (a in params$comparisons){
 #| results: asis
   for (cmp in names(test)) {
     cmp_label <- gsub(params$contrast,'',cmp )
-    cat( '##', paste(cmp_label,' P-values distribution ',sep=' '), '\n\n')
+    cat( '##', paste(cmp_label,' P-values distribution 
+                     ',sep=' '), '\n\n')
     
     render_child(data = test[[cmp]], 
                  pe =pe , 
                  label= cmp ,
-                 path=file.path(params$folder_prj, "Result","Contrast",cmp), template='_templatePval_distribution.Rmd') 
+                 path=file.path(params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)), template='_templatePval_distribution.Rmd') 
     cat('\n\n')
     
   }
@@ -720,22 +796,28 @@ log_info('Running Analysis for each comparison..')
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp , 
-                 path=file.path(params$folder_prj, "Result","Contrast",cmp),  
+                 path=file.path(params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),  
                  template='_templateContrast.Rmd') 
     cat('\n\n')
     
-    filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
-    #print(filt_val)
+   
 
     if ( dim(test[[cmp]]$toptable %>% filter(differential_expressed %in% c('UP','DOWN')) ) [1] <= 5   ){
       cat(' Not enough DE proteins for heatmap visualization \n')
     }else{
+      
+    #filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
+    #print(filt_val)
     
-      render_child(data = test[[cmp]],
+    contrast_values_paresed <- parse_comparison(cmp, params$contrast,pe)
+
+    filt_val <- select_samples_comparison(contrast_values_paresed, pe , params$contrast)
+    
+    render_child(data = test[[cmp]],
                    pe = pe,
                    sample_rel = filt_val,
                  label = cmp,
-                 path= file.path(  params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path(  params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),
                  template='_templateHeatMap.Rmd')
     }
     cat('\n\n')
@@ -746,7 +828,7 @@ log_info('Running Analysis for each comparison..')
     render_child(data = test[[cmp]],
                  pe =pe,
                  label = cmp,
-                 path= file.path( params$folder_prj, "Result","Contrast",cmp),
+                 path= file.path( params$folder_prj, "Result","Contrast",check_and_substitute_forbidden_chars(cmp)),
                  template='_templateBarPlot.Rmd')
     cat('\n\n')
     

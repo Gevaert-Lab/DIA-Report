@@ -12,11 +12,16 @@ normalization: 'quantiles' # "sum", "max", "center.mean", "center.median", "div.
 # include only proteotypic peptides
 Proteotypic: TRUE
 # number of peptide per proteins
-pep_per_prot: 3
-#number of samples per peptides  with non missing value > 
-nNonZero: 3
+pep_per_prot: 2
+#percentage of samples   with non missing value > 
+nNonZero: 30
+filtPerGroup: TRUE 
 comparisons: ['GroupB - GroupA','GroupD - GroupA']
 filtering_contaminats: FALSE
+quantitatve_features: 'Precursor.Quantity'
+mbr: TRUE
+comparison_label: ['B- A','D- A']
+DIANN_ver2: FALSE
 
 
 # ['GroupB - GroupA', 'GroupC - GroupA']

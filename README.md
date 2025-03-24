@@ -101,8 +101,9 @@ The parameters must be indicated in a YAML file. You can find an example in `par
 - `filtPerGroup`: Filtering of the NaN values based on `nNonZero` value applied per group (TRUE) or along all the samples (FALSE)
 - `mbr`: In case of MBR activated in DIA-NN, use Global.Q-value and Global.PG.Q-values to select precursor (Boolean: TRUE / FALSE)
 - `wildstr_run`: Wild string used to hook the run files (default: CMB-)
-- `DIANN_ver2`: If DIANN results are generated with version greater than 2, should be set to TRUE, otherwise FALSE
-
+- `DIANN_ver2`: If DIA-NN results are generated with version greater than 2, should be set to TRUE, otherwise FALSE
+- `comparison_label`: list of comparisons without indicate the variable name (e.g GroupA - GroupB -->  A - B)
+- `keep_design_order`: IF TRUE it keep the samples on the same order indicated in the design file. (default is FALS)
 Parameters can also be given as an R list, as shown in `Run_Template_FromR.R` and `Run_Template_FromR_peptide.R`.
 
 
