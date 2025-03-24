@@ -1,16 +1,15 @@
 
-
-######------check_DIANN_report-----------------------------------------------------
-#' @author
-#' check_DIANN_report
-#' This function checks some main sanity controls for the data retrieved in DIA 
+#' @author Andrea Argentini
+#' @title  check_DIANN_report
+#'  
 #' report 
+#' @description
+#'This function checks some main sanity controls for the data retrieved in DIA.
 #'Remark : Model result are supposed to be in proteinRS layer.
 #' 
 #' @param data_: data frame containing the DIA-NN report data
 #' @param q_feature: quantitative feature column to use 
-#'
-#' @return status : int 0 / 1 error found  
+#' @return status: int 0 / 1 error found  
 #' @return type_raw: format file of the raw file detected ,
 #' @error error: error message
 
@@ -45,14 +44,12 @@ check_DIANN_report <- function  (data_ , q_feature){
 }
   
   
-  ######------check_design_data-----------------------------------------------------
   #' @author Andrea Argentini
-  #' check_design_data
-  #'This function checks some main sanity controls in the design file 
+  #' @title check_design_data
+  #' @description This function checks some main sanity controls in the design file 
   #' e.g. Name of columns, min available columns.
   #' @param data_: data frame containing the DIA-NN report data
   #' @param design: data frame containing experiment design data 
-  #'
   #' @return status : int 0 / 1 error found  
   #' @return type_raw: format file of the raw file detected ,
   #' @error error: error message
@@ -78,18 +75,15 @@ check_design_data  <- function  (data_ , design, min_featues){
   
 }
 
-######------check_length_design_data-----------------------------------------------------
-#' @author 
-#' check_length_design_data
+#' @author Andrea Argentini
+#' @title check_length_design_data
+#' @description
 #' This function checks the names and the number of samples in DIA-NN report and experiment design data,
 #' if DIA-NN report has more samples than design file, only sample present in design file are kept.
 #'Remark : Model result are supposed to be in proteinRS layer.
-#' 
 #' @param data_: data frame containing the DIA-NN report data
 #' @param design: data frame containing experiment design data 
-#'
 #' @return status : int 0 / 1: error found, 2: samples in DIA-NN report are more than samples in experiment design data 
-
 #' @error error: error message
 #' @return message: message returned if data frame containing the DIA-NN report data is filtered
 
@@ -136,83 +130,16 @@ check_length_design_data  <- function  (data_ , design){
 } 
 
 
-######-----dfToWideMsqrob-------------------------
-#' @author Leander 
-#' dfToWideMsqrob
-#' This is not used anymore, should be remove soon. 
-#' MAching od sample name with run now is dobe using run columns
-#' This function after some quality check makes and filtering of some columns 
-#' It makes  wide version of the DIA-NN result using the precursorquant columns
-#' @param data frame containing the DIA-NN report data
-#' @param precursorquan: columns to use to pivot into a wide format 
-#' 
-#' @return status : A data frame of DIA-NN in a wide format 
-
-dfToWideMsqrob <- function(data, precursorquan, mbr) {
-  
-  if (mbr == TRUE) {
-    
-    data %>%
-      filter(
-        Global.PG.Q.Value <= 0.01 &
-          Global.Q.Value <= 0.01 &
-          Precursor.Id != "" & 
-          .data[[precursorquan]] > 0
-      ) %>%
-      dplyr::select(
-        File.Name, 
-        Precursor.Id, 
-        Modified.Sequence, 
-        Stripped.Sequence, 
-        Protein.Group,
-        Protein.Ids, 
-        Protein.Names, 
-        Genes, 
-        Proteotypic,
-        First.Protein.Description,
-        .data[[precursorquan]]
-      ) %>%
-      tidyr::pivot_wider(
-        names_from = File.Name,
-        values_from = .data[[precursorquan]]
-      )
-    
-  }else{   data %>%
-      filter(
-        PG.Q.Value <= 0.01 &
-          Q.Value <= 0.01 &
-          Precursor.Id != "" & 
-          .data[[precursorquan]] > 0
-      ) %>%
-      dplyr::select(
-        File.Name, 
-        Precursor.Id, 
-        Modified.Sequence, 
-        Stripped.Sequence, 
-        Protein.Group,
-        Protein.Ids, 
-        Protein.Names, 
-        Genes, 
-        Proteotypic,
-        First.Protein.Description,
-        .data[[precursorquan]]
-      ) %>%
-      tidyr::pivot_wider(
-        names_from = File.Name,
-        values_from = .data[[precursorquan]]
-      ) }
- 
-}
-
-######-----dfToWideMsqrob_20-------------------------
 #' @author Andrea
-#' dfToWideMsqrob
-#' This function after some quality check makes and filtering of some columns 
-#' It makes  wide version of the DIA-NN result using the precursorquant columns
+#' @title dfToWideMsqrob
+#' @describe
+#' This function after some quality check filters DIA-NN result using Q-value and
+#' and PG Qvalues. 
+#' It makes a wide version of the DIA-NN result using the precursorquant information
 #' @param data frame containing the DIA-NN report data
 #' @param precursorquan: columns to use to pivot into a wide format 
-#' 
-#' @return status : A data frame of DIA-NN in a wide format 
+#' @param wide_colums List of the columns that should be attached to the result
+#' @return status : A data frame of DIA-NN result in a wide format 
 #' 
 
 dfToWideMsqrob_20 <- function(data, precursorquan, mbr, wide_colums) {
@@ -253,22 +180,21 @@ dfToWideMsqrob_20 <- function(data, precursorquan, mbr, wide_colums) {
   
 }
 
-######--- DEP_volcano----------------------------
 #' @author Andrea Argentini 
-#' DEP_volcano
-#' This function computes volcano plot and gives the toptable for each contrast.
+#' @title DEP_volcano
+#' @description
+#' This function computes volcano plot and return the toptable for each comparison
 #' Remark : Model result are supposed to be in proteinRS layer.
-#' @param: label contrast name 
-#' @param: data Qfeatures object
-#' @param: imagesDir  folder where to save Volcano and toptable (as excel)
-#' @param: params document parameters list
-#'  @return toptable  toptable result as dataframe (with annotation added) 
-#'  @return volcano volcano ggplot object
+#' @param label contrast name 
+#' @param data Qfeatures object
+#' @param imagesDir  folder where to save Volcano and toptable result (as csv)
+#' @param params document parameters 
+#' @return toptable result as dataframe
 #' @return volcano volcano ggplot object
+#' @return volcano2file volcano ggplot annotated 
 
-DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
-  #quantile_protein
-  #data_selector= 'batch_corrected'
+dep_volcano <- function ( label, data ,  imagesDir ,p= params){
+
   cmp = label
   all_res <-  rowData(data[["proteinRS"]])[[label]]
   all_res <- all_res %>% rownames_to_column(var = 'Uniprot_id' )
@@ -343,21 +269,22 @@ DEP_volcano <- function ( label, data ,  imagesDir ,p= params){
 }
 
 
-######--- DEP_volcano_peptide----------------------------
+
 #' @author Andrea Argentini 
-#' DEP_volcano
-#' This function computes volcano plot and gives the toptable for each contrast.
-#' Remark : Model result are supposed to be in proteinRS layer.
-#' @param: label contrast name 
-#' @param: data Qfeatures object
-#' @param: imagesDir  folder where to save Volcano and toptable (as excel)
-#' @param: params document parameters list
-#'  @return toptable  toptable result as dataframe (with annotation added) 
-#'  @return volcano volcano ggplot object
+#' @title DEP_volcano_peptide
+#' @description
+#' This function computes volcano plot and return the toptable for each comparison
+#' Remark : Model result are supposed to be in peptideNorm layer.
+#' @param label contrast name 
+#' @param data Qfeatures object
+#' @param imagesDir  folder where to save Volcano and toptable result (as csv)
+#' @param params document parameters 
+#' @return toptable result as dataframe
 #' @return volcano volcano ggplot object
+#' @return volcano2file volcano ggplot annotated 
 
 
-DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
+dep_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
   #quantile_protein
   #data_selector= 'batch_corrected'
   cmp = label
@@ -430,15 +357,16 @@ DEP_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
 }
 
 
-####----render_child-----
-#' render_child
-#' This function allow to render other template.Rmd in the main quarto document
-#' @param data
-#' @param path
-#' @param pe
-#' @parma sample_rel
-#' @param template 
-#' @return none
+#' @author andrea Argentini
+#' @title render_child
+#' @description
+#'  This function allows to render other template.Rmd in the main quarto document
+#' @param data  DE result for each comparison
+#' @param path PAth where to store the result
+#' @param pe Q feature object, in case this data is required 
+#' @param sample_rel list of sample names related to the comparison
+#' @param template name of the template .Rms file (contrast,heatmap etc)
+#' @return None
 render_child <- function(data, path, pe, label , sample_rel,  template) {
   if (missing(sample_rel)  ){
     # _templateBArPlot.Rmd _templateContrast _templatePval
@@ -461,16 +389,15 @@ render_child <- function(data, path, pe, label , sample_rel,  template) {
   }
 }
 
-### check packages dependencies --------------------------
-#'
-#' @author Andrea Argentini 
-#'
-#' This function get a vector with names of packages.
-#' Check if packages are available, if not it installs them.
-#' Then, it loads the packages.
-#' @param required_packages : a vector with packages to be installed 
-#' @return none
 
+#' @author Andrea Argentini 
+#' @title check_dependencies
+#' @description
+#' This function gets a vector with names of packages and it 
+#' Check if packages are available, if not it installs them.
+#' Otherwise, it loads the  requiredpackages.
+#' @param required_packages list with packages to be installed 
+#' @return none
 check_dependencies = function(required_packages = required_packages){
   suppressPackageStartupMessages(
     for(i in required_packages){
@@ -487,15 +414,16 @@ check_dependencies = function(required_packages = required_packages){
 }
 
 
-###----------checkVariables!!! ------------------
 #' @author Andrea Argentini
-#' checkVariables
-#' This function implement sanity check related if the values are correct with respect 
-#' to the design file and its confounder values. 
+#' @title checkVariables
+#' @description
+#' This function implement sanity check if the values are correct with respect 
+#' to the design file
 #' @param inputParams: comparisons groups in input parameter list 
 #' @param dfDesign: data frame containing experiment design data 
 #' @param variables: data frame containing experiment design data 
 #' @return status : int 0 / 1 error message  
+
 checkVariables <- function(inputParams, dfDesign, variables) {
   # Initialize lists to collect status and errors
   statusList <- list()
@@ -508,12 +436,14 @@ checkVariables <- function(inputParams, dfDesign, variables) {
   processTerm <- function(term) {
     # Remove parentheses
     term <- gsub("[()]", "", term)
-    
-    # 2. Split by ':' and '+'
-    parts <- unlist(strsplit(term, "[:+]"))
-    
-    # 3. Clean up and extract variable values
-    values <- trimws(parts)
+    ## changed to deal with just one variable and not interacted terms
+    if (str_detect( term,"[:+]")){
+      # 2. Split by ':' and '+'
+      parts <- unlist(strsplit(term, "[:+]"))
+      values <- trimws(parts)
+    }else{
+      values <- trimws(term)
+    }
     values <- values[values != ""]  # Remove empty strings
     
     return(values)
@@ -552,14 +482,12 @@ checkVariables <- function(inputParams, dfDesign, variables) {
 
 
 
-######------checkGroups-----------------------------------------------------
 #' @author Caterina Lizzio
-#' checkGroups
+#' @title checkGroups
+#' @description
 #' This function checks if groups in input are the same as groups in metadata file
-#' 
 #' @param inputParams: comparisons groups in input parameter list 
 #' @param dfDesign: data frame containing experiment design data 
-#'
 #' @return status : int 0 / 1 error found  
 #' @error error: error message
 
@@ -579,14 +507,12 @@ checkGroups<- function (inputParams, dfDesign){
   
 }
 
-######------checkConfounderList-----------------------------------------------------
 #' @author Caterina Lizzio
-#' checkConfounderList
+#' @title checkConfounder
+#' @description
 #' This function checks if confounder values in input are present in design file
-#' 
 #' @param confounder: confounder values in input 
 #' @param colsDesign: colnames in design data 
-#'
 #' @return status : int 0 / 1 error found  
 #' @error error: error message
 checkConfounder<- function (confounder, colsDesign) {
@@ -602,11 +528,13 @@ checkConfounder<- function (confounder, colsDesign) {
   }
 
 }
-###--------------theme_custom_vis ----
+
 #' @author Andrea Argentini
-#' theme_custom_vis is used to set the default theme 
+#' @title theme_custom_vis
+#' @description 
+#' it is used to set the default theme 
 #' for all the ggplot plots
-#' @param base_size font size u
+#' @param base_size font size  for all the elements in the plot
 #' @return none
 theme_custom_vis <- function(base_size = 12) {
   theme_bw(base_size = base_size) %+replace% 
@@ -623,9 +551,9 @@ theme_custom_vis <- function(base_size = 12) {
 }
 
 
-######------generate_pca_plots--------------------------------------------
 #' @author Andrea Argentini
-#' generate_pca_plots
+#' @title  generate_pca_plots
+#' @description 
 #' This function generate PCA plots from a list of confounder or variables 
 #' included in the colData information of the Q-features object.
 #' It is allowed only two variable per plot (shape and color), and the valid 
@@ -752,10 +680,11 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
   }
   return (output_plot)
 }
-##-----------check_and_substitute_forbidden_chars--------------
+
 #' @author Andrea Argentini
-#' check_and_substitute_forbidden_chars
-#' This function removes eventually character not allowed in the Win. file name system
+#' @title check_and_substitute_forbidden_chars
+#' @description
+#' This function removes eventually character not allowed in the Window file system. 
 #' @param input_string input string with possible 
 #' @return outputstr_chr_removed  output string
  
@@ -771,21 +700,24 @@ check_and_substitute_forbidden_chars <- function(input_string) {
   return(input_string)
 }
 
-##-----------check_and_substitute_forbidden_chars--------------
 #' @author Andrea Argentini
-#' check_and_substitute_forbidden_chars
-#' This function  split strings and extract variable values
-#' @param input_string input string with possible 
+#' @title parse_comparison
+#' @description
+#' This function split the input  comparison label and extract variables and 
+#' their validity with respect to the ColData() of the current Q-feature object
+#' @param input_comparison input comparison label with possible 
 #' @param variable_names list of the variable name in the formula
-#' @return outputstr_chr_removed  output string
-split_and_check_values <- function(input_string, variable_names, pe) {
+#' @param pe  Q-feature object related to the analysis.
+#' @return list with left and right parsed value of the comparison 
+#' 
+parse_comparison <- function(input_comparison, variable_names, pe) {
   # Check if variable_names is empty
   if (length(variable_names) == 0 || (length(variable_names) == 1 && variable_names == '')) {
     stop("The variable_names vector is empty.")
   }
   
   # Split the string by '-'
-  split_strings <- strsplit(input_string, " - ")[[1]]
+  split_strings <- strsplit(input_comparison, " - ")[[1]]
   
   # Check if the split resulted in two parts
   if (length(split_strings) != 2) {
@@ -838,9 +770,18 @@ split_and_check_values <- function(input_string, variable_names, pe) {
 
 
 
+#' @author Andrea Argentini
+#' @title select_samples_comparison
+#' @description
+#' This function takes the text parsed from the comparison label and select the right. 
+#' sample in each contrast 
+#' @param test_parsing input comparison label, text is already parsed
+#' @param pe Q-feature object related to the analysis.
+#' @param variable_names list of the variable name in the formula
+#' @return list with left and right parsed value of the comparison 
 
 
-select_samples <- function(test_parsing, pe, variable_names) {
+select_samples_comparison <- function(test_parsing, pe, variable_names) {
   sample_sel <- character(0)  # Initialize as character vector
   
   # Helper function to get samples for a given term (Aleft or Bright)

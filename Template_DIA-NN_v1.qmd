@@ -733,7 +733,7 @@ L <- makeContrast(contrast_list, parameterNames = coef)
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
 
 
-test <-  lapply(params$comparisons, DEP_volcano, data= pe,  p=params )
+test <-  lapply(params$comparisons, dep_volcano, data= pe,  p=params )
 
 # params$comparison
 names(test) <-  params$comparison_label
@@ -809,10 +809,9 @@ log_info('Running Analysis for each comparison..')
     #filt_val <- unlist(str_split(substring(gsub(params$contrast, ' ', (gsub(' - ','',cmp))), 2),' ' ))
     #print(filt_val)
     
-    contrast_values_paresed <- split_and_check_values(cmp, params$contrast,pe)
-    
+    contrast_values_paresed <- parse_comparison(cmp, params$contrast,pe)
 
-   filt_val <- select_samples(contrast_values_paresed, pe , params$contrast)
+    filt_val <- select_samples_comparison(contrast_values_paresed, pe , params$contrast)
     
     render_child(data = test[[cmp]],
                    pe = pe,

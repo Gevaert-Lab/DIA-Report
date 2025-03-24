@@ -693,6 +693,7 @@ contrast_list <- paste0(params$comparisons, "=0")
 coef <- rowData(pe[["peptideNorm"]])$msqrobModels[[1]] %>% getCoef %>% names
 
 if (is.null(coef)) {
+         log_info('Inside if coef is null ...')
           coef <- rowData(pe[["peptideNorm"]])$msqrobModels[[2]] %>% getCoef %>% names
            #  log_info(getCoef(rowData(pe[['ptmRel']])$msqrobModels[[1]]))
           getCoef(rowData(pe[['peptideNorm']])$msqrobModels[[2]])
@@ -715,7 +716,7 @@ pe <- hypothesisTest(object = pe, i = "peptideNorm", contrast = L , overwrite=TR
 log_info('Saving pe object (qfeatures) as Rds file.')
 saveRDS(pe, file = file.path( params$folder_prj, "Result","qfeat_experimens.Rds"))
 
-test <-  lapply(params$comparisons, DEP_volcano_peptide, data= pe,  p=params )
+test <-  lapply(params$comparisons, dep_volcano_peptide, data= pe,  p=params )
 
 
 #names(test) <- params$comparisons 
@@ -783,9 +784,9 @@ log_info('Running Analysis for each comparison..')
       cat(' Not Significant proteins to be visualized in in the  heatmap \n')
     }else{
   
-       contrast_values_paresed <- split_and_check_values(cmp, params$contrast,pe)
+       contrast_values_parsed <- parse_comparison(cmp, params$contrast,pe)
 
-       filt_val <- select_samples(contrast_values_paresed, pe , params$contrast)
+       filt_val <- select_samples_comparison(contrast_values_parsed, pe , params$contrast)
    
       render_child(data = test[[cmp]], pe = pe
                  ,sample_rel = filt_val,

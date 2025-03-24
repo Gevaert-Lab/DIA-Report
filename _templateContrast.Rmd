@@ -58,11 +58,11 @@ if ( UP > 1 | DOWN > 1   ) {
       #extracted_values <- split_extract_values(label, params$contrast)
 
      log_info('Inside Boxplot intesisties')
-     contrast_values_paresed <- split_and_check_values(label, params$contrast, pe)
+     contrast_values_parsed <- parse_comparison(input_comparison = label, variable_names =  params$contrast, pe = pe)
      #log_info(contrast_values_paresed$Aleft)
      #log_info(contrast_values_paresed$Brigh)
 
-     sample_sel <- select_samples(contrast_values_paresed, pe , params$contrast)
+     sample_sel <- select_samples_comparison(contrast_values_parsed, pe , params$contrast)
 
   
      #log_info(length(sample_sel))
