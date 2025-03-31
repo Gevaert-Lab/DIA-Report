@@ -8,12 +8,9 @@ format:
     fig-height: 10
     toc: true
     toc-title: 'DE Analysis'
-    css: style.css
     title-block-banner: '#1b2944'
     title-block-banner-color: '#f79646'
-    include-in-header:
-      - text: |
-          <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
     
 
 execute: 
@@ -21,8 +18,8 @@ execute:
   warning: false
 embed-resources: true
 theme: 
- - brand 
- - custom.scss
+ - layout/brand 
+ - layout/custom.scss
 
 params:
   description: ""
@@ -56,59 +53,6 @@ params:
   comparison_label: ""
 ---
 
-<!-- <style> -->
-
-<!-- #logo -->
-
-<!-- { -->
-
-<!--     position: relative; -->
-
-<!-- } -->
-
-<!-- #logo img { -->
-
-<!--     /*position: relative;*/ -->
-
-<!--     top: 25px; -->
-
-<!--     /*right: 0px;*/ -->
-
-<!--     left: 50px; -->
-
-<!--     position: fixed; -->
-
-<!--     width: 125px; -->
-
-<!--     } -->
-
-<!-- #header .btn-group { -->
-
-<!--     display: none; -->
-
-<!-- } -->
-
-<!-- body -->
-
-<!-- { -->
-
-<!--     position: absolute; -->
-
-<!--     top: 150px; -->
-
-<!-- } -->
-
-<!-- </style> -->
-
-<!-- <div id="logo" align="top"> -->
-
-<!-- ```{r echo = FALSE} -->
-
-<!-- knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg') -->
-
-<!-- ``` -->
-
-<!-- </div> -->
 
 ```{r input}
  #| output: false
@@ -194,6 +138,10 @@ min_col_need_design <- c("Sample","Run", "Group", "Replicate")
 
 
 theme_set(theme_custom_vis())
+
+ st=format(Sys.time(), "%Y%m%d_%H%M")
+
+write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_parameter_",st ,  ".yaml")))
 
  
 ```
@@ -757,7 +705,7 @@ for (a in params$comparison_label){
 ```
 :::
 
-## Group Comparison
+## Comparison
 
 ::: panel-tabset
 ```{r comparison}

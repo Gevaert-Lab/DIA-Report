@@ -8,7 +8,6 @@ format:
     fig-height: 10
     toc: true
     toc-title: 'DE Analysis'
-    css: style.css
     title-block-banner: '#1b2944'
     title-block-banner-color: '#f79646'
 
@@ -17,8 +16,8 @@ execute:
   warning: false
 embed-resources: true
 theme: 
- - brand 
- - custom.scss
+ - layout/brand 
+ - layout/custom.scss
 
 params:
   description: ""
@@ -53,66 +52,12 @@ params:
   comparison_label: ""
 ---
 
-<!-- <style> -->
-
-<!-- #logo -->
-
-<!-- { -->
-
-<!--     position: relative; -->
-
-<!-- } -->
-
-<!-- #logo img { -->
-
-<!--     /*position: relative;*/ -->
-
-<!--     top: 25px; -->
-
-<!--     /*right: 0px;*/ -->
-
-<!--     left: 50px; -->
-
-<!--     position: fixed; -->
-
-<!--     width: 125px; -->
-
-<!--     } -->
-
-<!-- #header .btn-group { -->
-
-<!--     display: none; -->
-
-<!-- } -->
-
-<!-- body -->
-
-<!-- { -->
-
-<!--     position: absolute; -->
-
-<!--     top: 150px; -->
-
-<!-- } -->
-
-<!-- </style> -->
-
-<!-- <div id="logo" align="top"> -->
-
-<!-- ```{r echo = FALSE} -->
-
-<!-- knitr::include_graphics('images/vib_rf_medical_biotechnology_rgb_neg.jpg') -->
-
-<!-- ``` -->
-
-<!-- </div> -->
-
 ```{r input}
  #| output: false
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply','GGally','arrow')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','heatmaply','GGally','arrow','yaml')
 #print(required_packages)
 check_dependencies(required_packages)
 
@@ -189,8 +134,11 @@ if (!dir.exists(file.path(params$folder_prj))){
  
  
  theme_set(theme_custom_vis())
-
  
+ st=format(Sys.time(), "%Y%m%d_%H%M")
+
+write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_parameter_",st  , ".yaml")))
+
  
  
 ```
@@ -777,7 +725,7 @@ for (a in   params$comparison_label ){
 ```
 :::
 
-## Group Comparison
+## Comparison
 
 ::: panel-tabset
 ```{r comparison}

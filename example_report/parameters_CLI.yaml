@@ -1,0 +1,29 @@
+title: 'DIA Benchmark Experiment'
+subtitle: 'DE Analysis'
+author: 'Your Name' 
+description: 'Yeast as background and USP2 proteins spiked in different concentration. This experiment is designed for DIA benchmarking of different quantitative workflows.'
+input_file: '../report.tsv'
+design_file: '../annotation_DIA_updated.csv'
+formula: '~ -1 + Group'
+folder_prj: 'path/Project_result'
+contrast: 'Group'
+aggr_method: 'medianPolish' # medianPolish robustSummary() ; colMeans() colMedians() base::colSums()
+normalization: 'quantiles' # "sum", "max", "center.mean", "center.median", "div.mean", "div.median", "diff.meda", ⁠"quantiles⁠", ⁠"quantiles.robust⁠" or "vsn"
+# include only proteotypic peptides
+Proteotypic: TRUE
+# number of peptide per proteins
+pep_per_prot: 2
+#percentage of samples   with non missing value > 
+nNonZero: 30
+FC_thr: 1
+adjpval_thr: 0.05
+filtPerGroup: TRUE 
+comparisons: ['GroupB - GroupA','GroupD - GroupA']
+filtering_contaminats: FALSE
+quantitatve_features: 'Precursor.Quantity'
+mbr: TRUE
+comparison_label:
+- A - B
+- A - C
+- B - C
+DIANN_ver2: FALSE
