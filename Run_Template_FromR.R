@@ -49,15 +49,12 @@ input_report_parameter <- list(title =  "ADD TITLE",
                                filtering_contaminats= FALSE,
                                quantitatve_features= "Precursor.Quantity", #DIA-NN quantitative feature to use
                                filtPerGroup=TRUE , ## Filtering per group
-                               mbr= TRUE ## True if you have used MBR in your diaNN settings
-                               
+                               mbr= TRUE, ## True if you have used MBR in your diaNN settings
+                               DIANN_ver2= FALSE,
+                               comparison_label  = c('PD  - HC')
 )
 
-## save your parameter in a yaml file for future reference 
 
-yaml_string <- as.yaml(input_report_parameter)
-
-write(yaml_string, file = "run_parameter.yaml")
 
 
  ## customize your report file name                              
@@ -71,5 +68,6 @@ quarto_render(input= 'Template_DIA-NN_v1.qmd',
 
 # moving the report from the working folder to the target folder
 fs::file_move(filename_target, report_target_folder)
-fs::file_move("run_parameter.yaml", report_target_folder)
+fs::file_move("logfile_protein.log", report_target_folder)     
+
 

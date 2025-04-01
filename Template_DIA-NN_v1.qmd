@@ -83,6 +83,9 @@ is_empty <- function(contrast) {
   return(length(contrast) == 0 || (length(contrast) == 1 && contrast == ''))
 }
 
+detect_file_in_folder <- function(folder_path, pattern) { 
+          file <- list.files(folder_path, pattern = pattern); if(length(file) > 0) file[1] else "" }
+
 if(is_empty(params$contrast) ){
   stop("Check parameter file: contrast is not set" )
 }
@@ -180,12 +183,19 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   
   if (params$DIANN_ver2){
     log_info('Retrieve Protein description (ver > 2.0)...')
-
-    prt_desc <- read.csv( file.path(dirname(params$input_file),'report.protein_description.tsv'),sep="\t"  )
-    if ( ! file.exists(file.path(dirname(params$input_file),'report.protein_description.tsv'))){
-      	stop(paste0('file ',report.protein_description.tsv,  'not found in folder ->',
-      	            dirname(params$input_file),'\n',' Check your input path !' ))
+    
+    check_protein_desc <-  detect_file_in_folder(file.path(dirname(params$input_file)),
+                                                  'report.protein_description.tsv')
+    log_info(check_protein_desc)
+    log_info( file.path(dirname(params$input_file),check_protein_desc))
+    if (check_protein_desc != ""){
+      prt_desc <- read.csv( file.path(dirname(params$input_file),check_protein_desc),sep="\t"  )
+       
+    }else{
+       stop(paste0('file ','report.protein_description.tsv',  'not found in folder ->',
+       	            dirname(params$input_file),'\n',' Check your input path !' ))
     }
+
     
     dfMsqrob<- dfMsqrob %>% mutate(app = sapply(str_split(Protein.Names, ";"), function(x) ifelse(length(x) > 0, x[1], NA))) %>% 
        left_join( prt_desc %>% select(Protein.Name,Description) , 
@@ -828,11 +838,13 @@ colnames(df_summary) <- c('Total DE','Up DE','Down DE')
     # if there's 1 or 2 elements inlistInput and one of them is empty, skip uspset plot
     #log_info({length(listInput)})
  if (length(listInput)>=2 ) {
-    print (upset(fromList(listInput), order.by = "freq"))
+    #heuristic_interaction <- round(mean(sapply(p, length)) /2 )
+    print (upset(fromList(listInput), order.by = "freq", nsets = length(listInput) ) )
      
       pdf(file= paste0(file.path( params$folder_prj,"Result","Contrast"),'Upset_plot.pdf'),paper="a4")
        
-     print( upset(fromList(listInput),  nsets = 7 , order.by = "freq",text.scale= 1,empty.intersections = "on")) 
+     print( upset(fromList(listInput),  nsets = length(listInput) , order.by = "freq",text.scale= 1,
+                  empty.intersections = "on")) 
      
       invisible(dev.off())
       
