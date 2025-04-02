@@ -339,7 +339,7 @@ names(group_size) <- group_val
 
 for ( v in group_val){
     val = paste0('Zero',v)
-    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
     rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
@@ -424,7 +424,7 @@ log_info('Computing peptide level % not missing')
 
 for ( v in group_val){
     val = paste0('Zero',v)
-    rowData(pe[["peptideNorm"]])[[val]] <- assay(pe[["peptideNorm"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    rowData(pe[["peptideNorm"]])[[val]] <- assay(pe[["peptideNorm"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
     rowData(pe[["peptideNorm"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["peptideNorm"]])[[val]] ) / group_size[[v]]) *  100

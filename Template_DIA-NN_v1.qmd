@@ -306,10 +306,7 @@ colData(pe)$SampleName <- design$Sample
 
 colData(pe)$Replicate <- factor(design$Replicate)
 
-
 custom_col <- setdiff(colnames(design),min_col_need_design )
-
-
 
 if (length(custom_col) >= 1){
     log_info('Importing ConFounder....')
@@ -330,7 +327,6 @@ if (length(custom_col) >= 1){
 if (check_confounder_PCA$status == 1){
     stop(check_confounder_PCA$error)
 }
-
 rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
   assay %>%
   is.na %>%
@@ -347,9 +343,12 @@ group_val <- design %>% distinct(Group) %>%  pull()
  group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% pull(n_)
 names(group_size) <- group_val
 
+
+
 for ( v in group_val){
+    log_info(v)
     val = paste0('Zero',v)
-    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
     rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
@@ -437,7 +436,7 @@ log_info('Computing protein level % not missing')
 for ( v in group_val){
     val = paste0('Zero',v)
     log_info(val)
-    rowData(pe[["proteinRS"]])[[val]] <- assay(pe[["proteinRS"]])[,rownames(colData(pe)[colData(pe)$Group == v,])]  %>% is.na  %>% rowSums()
+    rowData(pe[["proteinRS"]])[[val]] <- assay(pe[["proteinRS"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
     ## 
     val_due = paste0('perc',v)
     rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
