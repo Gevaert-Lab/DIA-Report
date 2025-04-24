@@ -116,8 +116,8 @@ The parameters must be indicated in a YAML file. You can find an example in `par
 - `adjpval_thr`: Statistical threshold to select significant hits (adj.P-value default 0.05)
 - `ensembl_annotation`: Path of the file that contains the extra annotations to add to the proteins
 - `ensembl_col`: List of the annotation fields that are added. The last column must be a gene symbol
-- `filtering_contaminants`: Activate/deactivate the filtering of contaminants
-- `contaminats_str`: String used to mark the contaminants in the FASTA file (e.g., *Cont*)
+- `filtering_contaminant`: Activate/deactivate the filtering of contaminants
+- `contaminant_str`: String used to mark the contaminants in the FASTA file (e.g., *Cont*)
 - `cofounder_list`: List of the confounder name to use in confounder  analysis
 - `PCA_comparison`: List of confounder names to use in PCA analysis (e.g. *Group-ConfA*)
 - `quantitatve_features`: Quantitative feature column to use

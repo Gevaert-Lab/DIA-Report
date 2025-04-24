@@ -36,8 +36,8 @@ params:
   nNonZero: 30
   aggr_method: "medianPolish"
   normalization: "quantiles"
-  filtering_contaminats: ""
-  contaminats_str: ""
+  filtering_contaminant: ""
+  contaminat_str: ""
   folder_prj: ""
   ensembl_annotation: ""
   ensembl_col: ""
@@ -119,14 +119,12 @@ if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median",
    stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
 }
 
-if (params$filtering_contaminats){
-   if (params$contaminats_str == ""){
+if (params$filtering_contaminant){
+   if (params$contaminat_str == ""){
      stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminants,..)")
    } 
 }
-  ## to do visualize input contaminats_str(".","Result"))){
-#   dir.create('./Result')
-# }
+
 # make a subfolder for each contrast
 if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
@@ -363,7 +361,7 @@ The filtering steps applied are:
 
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
 -   Include proteins with at least **`r params$pep_per_prot` peptides**
--   `r if (params$filtering_contaminats) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
+-   `r if (params$filtering_contaminant) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
 
 
 
@@ -400,10 +398,10 @@ if (params$Proteotypic){
 
 ## filtering out contaminats
 
-if (params$filtering_contaminats){
+if (params$filtering_contaminant){
     log_info('Filtering contaminants')
 
-  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
+  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
 
 }
 
@@ -665,11 +663,16 @@ coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
 
     if (is.null(coef)) {
           coef <- rowData(pe[["proteinRS"]])$msqrobModels[[2]] %>% getCoef %>% names
-           #  log_info(getCoef(rowData(pe[['ptmRel']])$msqrobModels[[1]]))
+            #log_info(getCoef(rowData(pe[['proteinRS']])$msqrobModels[[2]]))
+          if (is.null(coef)){
+            stop ('Model is not able to converge')
+          }
           getCoef(rowData(pe[['proteinRS']])$msqrobModels[[2]])
 
 
     }else{
+      #log_info(getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]]))
+      ## print coefficent 
       getCoef(rowData(pe[['proteinRS']])$msqrobModels[[1]])
 
     }
@@ -683,8 +686,7 @@ coef <- rowData(pe[["proteinRS"]])$msqrobModels[[1]] %>% getCoef %>% names
 L <- makeContrast(contrast_list, parameterNames = coef)
 
 # L <- makeContrast(c( "ridgeGroupB - ridgeGroupA = 0"), parameterNames = c("ridgeGroupB","ridgeGroupA"))
-# rownames(L) <- paste0("ridge",rownames(L))
-
+#rownames(L) <- paste0("ridge",rownames(L))
 
 
 pe <- hypothesisTest(object = pe, i = "proteinRS", contrast = L , overwrite=TRUE)
