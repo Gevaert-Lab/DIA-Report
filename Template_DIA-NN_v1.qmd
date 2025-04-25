@@ -44,7 +44,7 @@ params:
   confounder_list: ""
   PCA_comparison: "Group"
   quantitatve_features: "Precursor.Quantity"
-  filtPerGroup: TRUE
+  filtPerGroup: ''
   mbr: FALSE
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
@@ -124,6 +124,17 @@ if (params$filtering_contaminant){
      stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminants,..)")
    } 
 }
+
+if (params$filtPerGroup == ''){
+      label_filtering <- ' among all the samples.'
+      }
+if (params$filtPerGroup == 'all'){
+      label_filtering <- ' in each group.'
+      }
+if (params$filtPerGroup == 'at_least_one'){
+      label_filtering <- ' in at least one group.'
+}
+
 
 # make a subfolder for each contrast
 if (!dir.exists(file.path(params$folder_prj))){
@@ -357,8 +368,7 @@ orig_nFeat <- dim(pe[['precursor']])[1]
 
 The filtering steps applied are:
 
--   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values   **`r  if (params$filtPerGroup) 'per group' else 'among all the groups'`**
-
+-   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values, `r label_filtering`
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
 -   Include proteins with at least **`r params$pep_per_prot` peptides**
 -   `r if (params$filtering_contaminant) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
@@ -372,15 +382,26 @@ size <- dim(colData(pe))[1]
 
 ## filtering per group
 
-  if (params$filtPerGroup) {
+  if (params$filtPerGroup != '') {
       log_info('filtering per group')
     
-      for ( v in group_val){
-          val = paste0('perc',v)
-          pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
-
-          
-      }
+    ## or 
+   if (params$filtPerGroup == 'at_least_one') { 
+       log_info('filtering per group criteria: in at least one group ')
+       perc_group_val <- paste0("perc", group_val)
+       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
+       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+   }
+    # and 
+    if (params$filtPerGroup == 'all') {
+        log_info('filtering per group criteria: for all the groups ')
+        perc_group_val <- paste0("perc", group_val)
+       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
+       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+       }
+   
+   pe <-  filterFeatures(pe,dynamic_formula)
+    
 
    }else{
         log_info('filtering across all samples')
