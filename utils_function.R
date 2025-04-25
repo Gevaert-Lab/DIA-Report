@@ -95,8 +95,7 @@ check_length_design_data  <- function  (data_ , design){
   data_sample <- colnames(data_)[10:length(colnames(data_))]
   ## filename does not exist 
   d_sample <- design %>% dplyr::select(Run) %>% pull()
-  
-  
+
   if (length(data_sample) < length(d_sample)){
     
     error <- 'Number of samples in the design file and in DIA-NN does not match'

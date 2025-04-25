@@ -162,14 +162,13 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
      log_info('Reading Data TSV format...')
      data <- read.csv(params$input_file,sep='\t')
      lst_wide_columns <- c('Run', 'Precursor.Id', 'Modified.Sequence', 'Stripped.Sequence', 'Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes', 'Proteotypic','First.Protein.Description')
+
   }
  
   ## deal csv  with different separated values 
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  
-  
   checkDIANN <- check_DIANN_report(data, q_feature=params$quantitatve_features)
     
   if (checkDIANN$status == 1 ) {
@@ -178,7 +177,8 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   
 
   dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features, mbr = params$mbr, wide_colums = lst_wide_columns)
-  
+
+
   if (params$DIANN_ver2){
     log_info('Retrieve Protein description (ver > 2.0)...')
     
@@ -271,8 +271,6 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   }
   
 
-
-
 ```
 
 ## Filtering steps
@@ -337,8 +335,10 @@ rowData(pe[["precursor"]])$pep_per_prot <-
               summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
 
 ## add statistics per group 
-group_val <- design %>% distinct(Group) %>%  pull()
- group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% pull(n_)
+group_val <- design %>% distinct(Group) %>% 
+              arrange(Group) %>%  pull()
+group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
+              arrange(Group) %>%  pull(n_)
 names(group_size) <- group_val
 
 
@@ -378,6 +378,7 @@ size <- dim(colData(pe))[1]
       for ( v in group_val){
           val = paste0('perc',v)
           pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
+
           
       }
 
@@ -386,7 +387,6 @@ size <- dim(colData(pe))[1]
        pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
 
   }  
- 
 
 # Proteotypic features
 if (params$Proteotypic){
@@ -409,7 +409,6 @@ if (params$filtering_contaminant){
 log_info('Filtering only n peptides per proteins')
 
 pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
-
 
 
 log_info('Intensity log tranformation')
