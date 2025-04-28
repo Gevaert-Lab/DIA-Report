@@ -45,8 +45,8 @@ params:
   ensembl_col: ""
   confounder_list: ""
   PCA_comparison: "Group"
-  quantitatve_features: "Precursor.Quantity"
-  filtPerGroup: TRUE
+  quantitative_features: "Precursor.Quantity"
+  filtPerGroup: ''
   mbr: FALSE
   wildstr_run: "CMB-"
   DIANN_ver2: FALSE 
@@ -129,9 +129,17 @@ if (params$filtering_contaminats){
      stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminats,..)")
    } 
 }
-  ## to do visualize input contaminats_str(".","Result"))){
-#   dir.create('./Result')
-# }
+
+if (params$filtPerGroup == ''){
+      label_filtering <- ' among all the samples.'
+      }
+if (params$filtPerGroup == 'all'){
+      label_filtering <- ' in each group.'
+      }
+if (params$filtPerGroup == 'at_least_one'){
+      label_filtering <- ' in at least one group.'
+}
+
 # make a subfolder for each contrast
 if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
@@ -151,7 +159,7 @@ write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_p
 
 ## Import data
 
-Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitatve_features`* from DIA-NN as quantitative features.
+Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitative_features`* from DIA-NN as quantitative features.
 `r if (params$mbr) 'All the precursors with *Global Q-value and Global PG Q-value < 0.01* are used for the analysis' else 'All the precursors with *Q-value and PG Qvalue < 0.01* are used for the analysis'`
 
 ```{r import data}
@@ -175,13 +183,13 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  checkDIANN<-check_DIANN_report(data, q_feature=params$quantitatve_features)
+  checkDIANN<-check_DIANN_report(data, q_feature=params$quantitative_features)
     
   if (checkDIANN$status == 1 ) {
     stop(checkDIANN$error)
     } 
   
-  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitatve_features,
+  dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitative_features,
                           mbr = params$mbr, wide_colums = lst_wide_columns) 
   
   if (params$DIANN_ver2){
@@ -350,8 +358,7 @@ orig_nFeat <- dim(pe[['precursor']])[1]
 
 The filtering steps applied are:
 
--   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values   **`r  if (params$filtPerGroup) 'per group' else 'among all the groups'`**
-
+-   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values, `r label_filtering`
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
 -   `r if (params$filtering_contaminats) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
 
@@ -367,13 +374,24 @@ size <- dim(colData(pe))[1]
 
 
   if (params$filtPerGroup) {
-      log_info('filtering per group')
+       log_info('filtering per group')
     
-      for ( v in group_val){
-          val = paste0('perc',v)
-           pe <- filterFeatures(pe, as.formula(paste0('~ ', val, ' >= ', params$nNonZero )))
-          
-      }
+    ## or 
+   if (params$filtPerGroup == 'at_least_one') { 
+       log_info('filtering per group criteria: in at least one group ')
+       perc_group_val <- paste0("perc", group_val)
+       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
+       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+   }
+    # and 
+    if (params$filtPerGroup == 'all') {
+        log_info('filtering per group criteria: for all the groups ')
+        perc_group_val <- paste0("perc", group_val)
+       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
+       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+       }
+   
+   pe <-  filterFeatures(pe,dynamic_formula)
 
    }else{
         log_info('filtering across all samples')
