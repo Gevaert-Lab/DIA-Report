@@ -38,7 +38,7 @@ params:
   nNonZero: 30
   aggr_method: "medianPolish"
   normalization: "quantiles"
-  filtering_contaminats: ""
+  filtering_contaminant: ""
   contaminats_str: ""
   folder_prj: ""
   ensembl_annotation: ""
@@ -62,7 +62,7 @@ params:
 source('utils_function.R')
 
 required_packages = c("QFeatures","msqrob2","readxl","SummarizedExperiment","visdat","ggrepel", "dplyr","tidyverse","magrittr","here","tidyr","plotly","DT","tibble","MSnbase",
-                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally','arrow')
+                    "factoextra","hrbrthemes","gridExtra","UpSetR",'logger', 'scales','pander','GGally','arrow','yaml')
 #print(required_packages)
 check_dependencies(required_packages)
 
@@ -124,7 +124,7 @@ if ( ! params$normalization %in% c("sum", "max", "center.mean", "center.median",
    stop('normalization method not allowed. Methods allowed are : [ sum, max, center.mean, center.median, div.mean, div.median, diff.meda, quantiles,quantiles.robust,vsn]' )
 }
 
-if (params$filtering_contaminats){
+if (params$filtering_contaminant){
    if (params$contaminats_str == ""){
      stop("Please provide a string to filter the contaminats proteins (e.g.: Cont_,Contaminats,..)")
    } 
@@ -360,7 +360,7 @@ The filtering steps applied are:
 
 -   Keeping only precursors with more than \>= **`r params$nNonZero`%** of *non missing* values, `r label_filtering`
 -   `r if (params$Proteotypic) 'Selecting only proteotypic peptides' else 'Selecting both not and proteotypic peptides'`
--   `r if (params$filtering_contaminats) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
+-   `r if (params$filtering_contaminant) 'Contaminant proteins are filtered ' else 'Contaminant proteins are not filtered'`
 
 
 
@@ -373,7 +373,7 @@ size <- dim(colData(pe))[1]
 
 
 
-  if (params$filtPerGroup) {
+  if (params$filtPerGroup != '' ) {
        log_info('filtering per group')
     
     ## or 
@@ -411,7 +411,7 @@ if (params$Proteotypic){
 
 ## filtering out contaminats
 
-if (params$filtering_contaminats){
+if (params$filtering_contaminant){
       log_info('Filtering contaminants')
 
   pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminats_str, "contains", not=TRUE))
@@ -431,11 +431,14 @@ log_info('Intensity log tranformation')
 
 pe <- logTransform(pe, base = 2, i = "PeptideRawSum",
                    name = "peptideLog")
+
+pe <- infIsNA(pe, i='peptideLog')
 log_info('Normalization')
+
 pe <- normalize(pe,  method = params$normalization, i = "peptideLog",
                 name = "peptideNorm")
 
-pe <- infIsNA(pe, i='peptideNorm')
+#pe <- infIsNA(pe, i='peptideNorm')
 
 
 log_info('Computing peptide level % not missing')
@@ -538,12 +541,13 @@ After all the step, the quantitaive features used in the downstream analysis are
 
 
 ```{r normalization_plot}
+
+saveRDS(pe, 'PE__.Rds') 
 par(mfrow=c(1,3))
 limma::plotDensities(assay(pe[["precursor"]]),legend=FALSE,main='Raw precursor')
 limma::plotDensities(assay(pe[["peptideLog"]]),legend=FALSE,main='Peptide log-tranformed') 
 limma::plotDensities(assay(pe[["peptideNorm"]]),legend=FALSE,main='Peptide Normalized' )
 
-#saveRDS(pe, file ='C:\\Users\\catel\\OneDrive\\Documenti\\GitHub\\DIA-Report\\pe_debug.RDS')
 ```
 
 
