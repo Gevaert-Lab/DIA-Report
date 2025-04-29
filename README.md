@@ -4,7 +4,7 @@ Welcome to **DIA-Report**! Your ultimate buddy for DE reports on DIA proteomics 
 
 With **DIA-Report**, you can generate advanced differential expression analysis reports based on **DIA-NN results** with just one magical command. ✨
 
-The statistical analysis is powered by **MSQrob2** and **Qfeatures** packages, allowing you to filter your data with various parameters and perform differential expression on proteomics data. The high number of parameters allows you to customize the analysis to your needs (normalization methods, missing value filtering, aggregation methods) and not rely on just black-box statistical analysis. 🎛️🧪
+The statistical analysis is powered by **MSQrob2** and **Qfeatures** packages, allowing you to filter your data with various parameters and perform differential expression on proteomics data. The high number of parameters allows you to customize the analysis to your needs (normalization methods, missing value filtering, aggregation methods) and avoid relying solely on black-box statistical methods. 🎛️🧪
 
 ## 📑 Table of Contents
 
@@ -48,20 +48,20 @@ The statistical analysis is powered by **MSQrob2** and **Qfeatures** packages, a
 
 ## 📈 Test Quantitative Proteomics Data
 
-In the folder *example_report*, you found the following files :
+In the folder *example_report*, you will find the following files:
 
 -   **DIA_data.zip**: This includes the DIANN report and EDF file from [Staes, An, et al.](https://pubs.acs.org/doi/10.1021/acs.jproteome.4c00048?ref=PDF).
--   *DIA_benchmark.zip*: This folder contains the report generate for our test dataset along with the all the result saved in structured way.\
+-   *DIA_benchmark.zip*: This folder contains the report generated for our test dataset, along with all the results saved in a structured way.\
 -   **parameter_CLI.yaml**: Yaml parameter file, in case you want to render your report from Quarto CLI (see [📝 How to Generate the HTML Report](#-how-to-generate-the-html-report)).
 -   **Run_DIAReport.R**: R script to render your report using R Quarto.
 
 After you have unzipped *DIA_data.zip*, you only need to change the path of the input and design file in the R script to start the analysis.
 
-Just to have to the final report looks like, open the html report included in *DIA_benchmark.zip*.
+To see what the final report looks like, open the html report included in *DIA_benchmark.zip*.
 
 ## 📝 How to Generate the HTML Report
 
-To use the DIA report, follow these steps:
+To generate the DIA report, follow these steps:
 
 1.  Clone the DIA-Report repository locally.
 2.  Install the required libraries in your R installation.
@@ -122,11 +122,11 @@ The parameters must be indicated in a YAML file. You can find an example in `par
 -   `wildstr_run`: Wild string used to hook the run files (default: CMB-)
 -   `DIANN_ver2`: If DIA-NN results are generated with version greater than 2, should be set to TRUE, otherwise FALSE
 -   `comparison_label`: list of comparisons without indicating the variable name (e.g *GroupA - GroupB --\> A - B*)
--   `keep_design_order`: IF TRUE, it keeps the samples in the same order indicated in the design file. (default is FALSE)
+-   `keep_design_order`: If TRUE, it keeps the samples in the same order indicated in the design file. (default is FALSE)
 
 Parameters can also be given as an R list (see `example_report/Run_DIAReportR.R` ) in case you render the report from R.
 
-**Remark**: With DIANN v2+, the report is saved as **parquet** data format and in the path of the `input_file` **must** be also present **'report.protein_description.tsv** file. If this file is not found, an exception is through.
+**Remark**: With DIANN v2+, the report is saved as **parquet** data format and in the path of the `input_file` **must** be also present **'report.protein_description.tsv** file. If this file is not found, an exception is thrown.
 
 ## 📝 Experiment Design File (EDF)
 

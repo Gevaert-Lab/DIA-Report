@@ -23,13 +23,12 @@ library(yaml)
 ### ------  -----------#
 
 
-
 report_target_folder <- '../Project_folder'
 
 input_report_parameter <- list(title =  "DIANN_Ecoli_spikeUPS2",
                                subtitle = 'DE Analysis', 
                                author= 'A.Argentini',
-                               description= 'Yeast as background and USP2 proteins spiked in different concentration. This Experiment is designed for DIA benchmarking of different workflow using DIA-NN.',
+                               description= 'Yeast as background and USP2 proteins spiked in different concentration. This experiment is designed for DIA benchmarking of different workflow using DIA-NN.',
                                input_file= 'path/report.tsv', # path to DIANN report (tsv or parquet)
                                design_file = 'path/annotation_DIA.csv',
                                folder_prj = report_target_folder ,
@@ -42,8 +41,8 @@ input_report_parameter <- list(title =  "DIANN_Ecoli_spikeUPS2",
                                nNonZero= 30,
                                comparisons= c('GroupA - GroupB', 'GroupA - GroupC','GroupB - GroupC'),
                                quantitative_features= 'Precursor.Translated',
-                               filtering_contaminats= FALSE ,
-                               filtPerGroup= 'at_least_one',
+                               filtering_contaminant= FALSE ,
+                               filtPerGroup= '',
                                mbr= TRUE,
                                DIANN_ver2= FALSE,
                                comparison_label  = c("A - B","A - C","B - C" )
