@@ -143,7 +143,7 @@ check_length_design_data  <- function  (data_ , design){
 
 dfToWideMsqrob_20 <- function(data, precursorquan, mbr, wide_colums) {
   
-  if (mbr == TRUE) {
+  if (mbr == FALSE) {
     
     data %>%
       filter(
@@ -163,8 +163,8 @@ dfToWideMsqrob_20 <- function(data, precursorquan, mbr, wide_colums) {
     
   }else{   data %>%
       filter(
-        PG.Q.Value <= 0.01 &
-          Q.Value <= 0.01 &
+        Lib.PG.Q.Value <= 0.01 &
+          Lib.Q.Value <= 0.01 &
           Precursor.Id != "" & 
           .data[[precursorquan]] > 0
       ) %>%

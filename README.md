@@ -118,7 +118,7 @@ The parameters must be indicated in a YAML file. You can find an example in `par
 -   `PCA_comparison`: List of confounder names to use in PCA analysis (e.g. *Group-ConfA*)
 -   `quantitative_features`: Quantitative feature column to use
 -   `filtPerGroup`: Filtering of the NaN values based on `nNonZero` value applied in at least one group (`at_least_one`), in all the groups (`all`), or along all the samples (`Empty string ''`)
--   `mbr`: In case of MBR activated in DIA-NN, use Global.Q-value and Global.PG.Q-values to select precursor (Boolean: TRUE / FALSE)
+-   `mbr`: In case of MBR in DIA-NN, Lib.Q-value and Lib.PG.Q-values are used to select precursor insted of Global.Q-value & Global.PG.Q-value (Boolean: TRUE / FALSE)
 -   `wildstr_run`: Wild string used to hook the run files (default: CMB-)
 -   `DIANN_ver2`: If DIA-NN results are generated with version greater than 2, should be set to TRUE, otherwise FALSE
 -   `comparison_label`: list of comparisons without indicating the variable name (e.g *GroupA - GroupB --\> A - B*)

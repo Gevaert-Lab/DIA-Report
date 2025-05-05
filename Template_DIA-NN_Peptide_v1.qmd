@@ -160,7 +160,7 @@ write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_p
 ## Import data
 
 Reading DIA data from **`r basename(params$input_file)`** using *`r params$quantitative_features`* from DIA-NN as quantitative features.
-`r if (params$mbr) 'All the precursors with *Global Q-value and Global PG Q-value < 0.01* are used for the analysis' else 'All the precursors with *Q-value and PG Qvalue < 0.01* are used for the analysis'`
+`r if ( ! params$mbr) 'All the precursors with *Global Q-value and Global PG Q-value < 0.01* are used for the analysis' else 'All the precursors with *Lib Q-value and Lib PG Qvalue < 0.01* are used for the analysis'`
 
 ```{r import data}
 
