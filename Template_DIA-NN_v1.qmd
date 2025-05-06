@@ -143,16 +143,13 @@ if (!dir.exists(file.path(params$folder_prj))){
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
  min_col_need_design <- c("Sample","Run", "Group", "Replicate")
 
- 
- 
+
  theme_set(theme_custom_vis())
  
  st=format(Sys.time(), "%Y%m%d_%H%M")
 
 write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_parameter_",st  , ".yaml")))
 
- 
- 
 ```
 
 ## Import data
@@ -180,16 +177,16 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  checkDIANN <- check_DIANN_report(data, q_feature=params$quantitative_features)
+  checkDIANN <- check_DIANN_report(_data, q_feature=params$quantitativefeatures)
     
   if (checkDIANN$status == 1 ) {
     stop(checkDIANN$error)
     } 
-  
-
+ 
+   
   dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitative_features, mbr = params$mbr, wide_colums = lst_wide_columns)
 
-
+  
   if (params$DIANN_ver2){
     log_info('Retrieve Protein description (ver > 2.0)...')
     
@@ -216,7 +213,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
  
   result_check <- check_design_data(dfMsqrob,design, min_featues =  min_col_need_design) 
   
-  if (result_check$status == 1  ){
+  if (result_check$status == 1) {
     stop(result_check$error)
   }  
   
@@ -224,12 +221,12 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   checkLength<-check_length_design_data(dfMsqrob, design)
 
   if (checkLength$status==1){
-	stop(checkLength$error)
+	  stop(checkLength$error)
   }
   
   if (checkLength$status==2){
-  dfMsqrob <- checkLength$data_
-  log_info(checkLength$message)
+    dfMsqrob <- checkLength$data_
+    log_info(checkLength$message)
   #checkLength$message
   }
   
@@ -248,7 +245,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   # }
   # 'Group' as in the metadata file
   var2check <- 'Group'
-  if (! is_empty(params$confounder_list) ){
+  if (! is_empty(params$confounder_list) ) {
       var2check <- append(var2check,params$confounder_list)
   }  
   
@@ -261,7 +258,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   #  params$wildstr_run
   
  samplenames <- tibble(
-   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   params$wildstr_run )  ]
+   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob) ,   params$wildstr_run )  ]
     ) 
     
  

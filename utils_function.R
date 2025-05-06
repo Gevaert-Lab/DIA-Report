@@ -18,7 +18,7 @@ check_DIANN_report <- function  (data_ , q_feature){
   status <- 0
   error <-
     ## check if precursor. translated is there  
-    min_precursor_col<- c("Precursor.Translated","Precursor.Normalised","Precursor.Quantity")
+    min_precursor_col<- c("Precursor.Normalised","Precursor.Quantity",'Precursor.Translated')
   if (! any (min_precursor_col %in% q_feature)==TRUE){
     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
     
@@ -42,7 +42,81 @@ check_DIANN_report <- function  (data_ , q_feature){
   return(list(status=status))
   
 }
+
+#' assuming diaNN_data is already wide format 
   
+import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
+  
+  ## check 
+  result_check <- check_design_data(diaNN_data,design, min_featues =  min_col_need_design) 
+  
+  if (result_check$status == 1) {
+    stop(result_check$error)
+  }  
+  
+  
+  checkLength<-check_length_design_data(dfMsqrob, design)
+  
+  if (checkLength$status==1){
+    stop(checkLength$error)
+  }
+  
+  if (checkLength$status==2){
+    dfMsqrob <- checkLength$data_
+    log_info(checkLength$message)
+    #checkLength$message
+  }
+  
+  ## first check confounders in design file
+  if ( ! is_empty(params$confounder_list)  ) {
+    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+    if (check_confounder_list$status == 1){
+      stop(check_confounder_list$error)
+    }
+  }
+  
+ 
+  var2check <- 'Group'
+  if (! is_empty(params$confounder_list) ) {
+    var2check <- append(var2check,params$confounder_list)
+  }  
+  
+  checkVar_res <-checkVariables(inputParams =params$comparisons , 
+                                dfDesign = design, variables= var2check)
+  if (checkVar_res$status==1){
+    stop(checkVar_res$error)
+  }
+  
+  #  params$wildstr_run
+  
+  samplenames <- tibble(
+    base_name_sample = names(diaNN_data)[str_which(names(diaNN_data) ,   params$wildstr_run )  ]
+  ) 
+  
+  
+  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
+
+  
+  
+  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
+  
+  diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
+                     "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
+  
+  if (params$keep_design_order == TRUE) {
+    ## order sample to follow the original design file order
+    dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
+  }
+  
+  pe <- readQFeatures( dfMsqrob,
+                       fnames = "Precursor.Id",
+                       quantCols =  str_detect(names(dfMsqrob), paste( diann_colname , collapse = "|"), negate=TRUE) ,
+                       name = "precursor")
+  
+  return( pe ) 
+}
+
+
   
   #' @author Andrea Argentini
   #' @title check_design_data
@@ -114,7 +188,7 @@ check_length_design_data  <- function  (data_ , design){
     dfSample<- dfMsqrob[,(colnames(dfMsqrob)%in% d_sample)]
     ## "First.Protein.Description" on hold for the moment
     df  <- cbind(dfMsqrob[, c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
-                        "Protein.Ids","Protein.Names","Genes","Proteotypic")], dfSample)
+                        "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")], dfSample)
     message <- 'Number of samples in DIA-NN is bigger than number of samples in design file.'
     return(list(status=status, error = error, message=message , data_ = df))
   }else{
