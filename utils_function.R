@@ -51,18 +51,21 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
   result_check <- check_design_data(diaNN_data,design, min_featues =  min_col_need_design) 
   
   if (result_check$status == 1) {
-    stop(result_check$error)
+    
+    return( list(error= result_check$error, status= result_check$status,q_feat =NULL ))   
+    
   }  
   
   
-  checkLength<-check_length_design_data(dfMsqrob, design)
+  checkLength<- check_length_design_data(dfMsqrob, design)
   
   if (checkLength$status==1){
-    stop(checkLength$error)
+
+    return( list(error= checkLength$error, status= checkLength$status ,q_feat =NULL ))   
   }
   
   if (checkLength$status==2){
-    dfMsqrob <- checkLength$data_
+    diaNN_data <- checkLength$data_
     log_info(checkLength$message)
     #checkLength$message
   }
@@ -71,7 +74,8 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
   if ( ! is_empty(params$confounder_list)  ) {
     check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
-      stop(check_confounder_list$error)
+      return( list(error= check_confounder_list$error, status= check_confounder_list$status,q_feat =NULL ))   
+      
     }
   }
   
@@ -84,7 +88,8 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
   checkVar_res <-checkVariables(inputParams =params$comparisons , 
                                 dfDesign = design, variables= var2check)
   if (checkVar_res$status==1){
-    stop(checkVar_res$error)
+    #stop(checkVar_res$error)
+    return( list(error= checkVar_res$error, status= checkVar_res$status,q_feat =NULL ))   
   }
   
   #  params$wildstr_run
@@ -98,22 +103,56 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
 
   
   
-  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
+  names(diaNN_data)[str_which(names(diaNN_data),  params$wildstr_run ) ] <- samplenames$Sample
   
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
                      "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
   
   if (params$keep_design_order == TRUE) {
     ## order sample to follow the original design file order
-    dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
+    diaNN_data <- diaNN_data[, c(diann_colname, design$Sample) ]
   }
   
-  pe <- readQFeatures( dfMsqrob,
-                       fnames = "Precursor.Id",
-                       quantCols =  str_detect(names(dfMsqrob), paste( diann_colname , collapse = "|"), negate=TRUE) ,
-                       name = "precursor")
+  tryCatch( expr = {
+    
+    pe <- readQFeatures( diaNN_data,
+                         fnames = "Precursor.Id",
+                         quantCols =  str_detect(names(diaNN_data), paste( diann_colname , collapse = "|"), negate=TRUE) ,
+                         name = "precursor")
+    
+    # add Coldata 
+    colData(pe)$Group <- factor(design$Group)
+    colData(pe)$SampleName <- design$Sample
+    
+    #group column from design is now Group in coData(pe)
+    
+    colData(pe)$Replicate <- factor(design$Replicate)
+    ## settinc confounder
+    custom_col <- setdiff(colnames(design),min_col_need_design )
+    
+    if (length(custom_col) >= 1){
+      log_info('Importing ConFounder in Q-feature ....')
+      for (col_add in custom_col){
+        
+        if  (is.character(design[[col_add]])) {
+          log_info(paste('Chr ', col_add))
+          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
+        }else{  
+          log_info(paste('Num ', col_add))
+          colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
+        }
+        
+      }
+    }
+    
+    return( list(error= '', status= 0,q_feat =pe ))
+    
+  }, error = function(err){
+    print(paste("Q-feature err:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
   
-  return( pe ) 
+  
 }
 
 
