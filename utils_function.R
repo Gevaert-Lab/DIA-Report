@@ -13,7 +13,7 @@
 #' @return type_raw: format file of the raw file detected ,
 #' @error error: error message
 
-check_DIANN_report <- function  (data_ , q_feature){
+check_DIANN_report <- function(data_ , q_feature){
   
   status <- 0
   error <-
@@ -43,11 +43,146 @@ check_DIANN_report <- function  (data_ , q_feature){
   
 }
 
-#' assuming diaNN_data is already wide format 
+#' @author Andrea Argentini
+#' @title  filteringNA_qfeat_proteinwf
+#'  
+#' @description
+#'This function adds number and percentage of non missing value for each group in assay specified.
+#' Moreover it adds computed the number of peptide per protien and the total number of non missing values.
+#' 
+#' @param pe_: q_feature object where to add rowdata
+#' @param parameters: EDF data frame 
+#' @param design: EDF data frame
+#' @return pe_: modified q-feature object
+
+filteringNA_qfeat_proteinwf <- function(pe_ , parameters, design){
+  group_val <- design %>% distinct(Group) %>% 
+    arrange(Group) %>%  pull()
+
+  if (params$filtPerGroup != '') {
+    log_info('filtering per group')
+    
+    ## or 
+    if (params$filtPerGroup == 'at_least_one') { 
+      log_info('filtering per group criteria: in at least one group ')
+      perc_group_val <- paste0("perc", group_val)
+      formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
+      dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+    }
+    # and 
+    if (params$filtPerGroup == 'all') {
+      log_info('filtering per group criteria: for all the groups ')
+      perc_group_val <- paste0("perc", group_val)
+      formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
+      dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+    }
+    
+    pe_ <-  filterFeatures(pe_,dynamic_formula)
+    
+    
+  }else{
+    log_info('filtering across all samples')
+    pe_ <- filterFeatures(pe_, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+    
+  }  
+  if (params$Proteotypic){
+    log_info('Proteotypic filtering')
+    
+    pe_ <- filterFeatures(pe_, ~ Proteotypic == 1)
+    
+  }
   
-import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
+  ## filtering out contaminats
   
-  ## check 
+  if (params$filtering_contaminant){
+    log_info('Filtering contaminants')
+    
+    pe_ <- filterFeatures ( pe_ ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
+    
+  }
+  
+  # At least 2 peptides per protein across all groups
+  log_info('Filtering only n peptides per proteins')
+  
+  pe_ <- filterFeatures(pe_, ~ pep_per_prot > params$pep_per_prot)
+  
+  return(pe_)
+  
+} 
+
+
+#' @author Andrea Argentini
+#' @title  add_rowdata_detection
+#'  
+#'  
+#' @description
+#'This function adds number and percentage of non missing value for each group in assay specified.
+#' Moreover it adds computed the number of peptide per protien and the total number of non missing values.
+#' 
+#' @param pe_: q_feature object where to add rowdata
+#' @param design: EDF data frame 
+#' @param assay: assay name where to add the statistics
+#' @return pe_: modified q-feature object
+
+add_rowdata_detection <- function ( pe_ , design , assay ){
+    if (assay == 'precursor'){
+      log_info(paste0('Computing extra info (nNonZero) at ', assay, ' ...'))
+      
+      rowData(pe_[[assay]])$nNonZero <- pe_[[assay]] %>%
+        assay %>%
+        is.na %>%
+        not %>%
+        rowSums
+      log_info(paste0('Computing extra info (pep_per_prot) at ', assay, ' ...'))
+      
+      rowData(pe_[[assay]])$pep_per_prot <-
+        left_join(rowData(pe_[[assay]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
+                  rowData(pe_[[assay]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
+                    summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
+      
+      ## add statistics per group 
+      
+    }
+    ## statistics on percetange of detection 
+    group_val <- design %>% distinct(Group) %>% 
+      arrange(Group) %>%  pull()
+    group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
+      arrange(Group) %>%  pull(n_)
+    names(group_size) <- group_val
+    
+    log_info(paste0('Computing  % not missing at ', assay, ' ...'))
+    for ( v in group_val){
+      log_info(v)
+      val_count = paste0('Zero',v)
+      rowData(pe_[[assay]])[[val_count]] <- assay(pe_[[assay]])[,rownames(colData(pe_)[colData(pe_)$Group == v,]),drop = FALSE]  %>% 
+        is.na  %>% rowSums()
+      ##  
+      val_perc = paste0('perc',v)
+      rowData(pe_[[assay]])[[val_perc]] <- ((group_size[[v]] - rowData(pe_[[assay]])[[val_count]] ) / group_size[[v]]) *  100
+    }
+      
+  return ( pe_ )
+}
+
+
+#' @author Andrea Argentini
+#' @title  import2_qfeature
+#'  
+#' report 
+#' @description
+#'This function checks some main sanity controls for the data retrieved in DIA.
+#'Remark : Model result are supposed to be in proteinRS layer.
+#' 
+#' @param diaNN_data: data frame containing the DIA-NN in a wide format
+#' @param params: list of parameters
+#' @param min_col_need_design: list of the mandatory fields in EDF file
+#' @param diann_colname: columns names 
+#' @return status: int 0 non error  / 1 error found  
+#' @return q_feat: q-feature created ,
+#' @return error: error message  
+import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, diann_colname ){
+  
+  log_info('Check EDF file information ...')
   result_check <- check_design_data(diaNN_data,design, min_featues =  min_col_need_design) 
   
   if (result_check$status == 1) {
@@ -56,6 +191,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
     
   }  
   
+  log_info('Check Sample names and their number in DIA-NN and EDF ...')
   
   checkLength<- check_length_design_data(dfMsqrob, design)
   
@@ -71,6 +207,8 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
   }
   
   ## first check confounders in design file
+  log_info('Check confounder in EDF ...')
+  
   if ( ! is_empty(params$confounder_list)  ) {
     check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
@@ -79,7 +217,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
     }
   }
   
- 
+  log_info('Check comparisons withEDF ...')
   var2check <- 'Group'
   if (! is_empty(params$confounder_list) ) {
     var2check <- append(var2check,params$confounder_list)
@@ -93,66 +231,61 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design ){
   }
   
   #  params$wildstr_run
+  log_info('Matching DIANN sample name with  EDF ...')
   
   samplenames <- tibble(
     base_name_sample = names(diaNN_data)[str_which(names(diaNN_data) ,   params$wildstr_run )  ]
   ) 
   
-  
   samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
 
-  
-  
   names(diaNN_data)[str_which(names(diaNN_data),  params$wildstr_run ) ] <- samplenames$Sample
-  
-  diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
-                     "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
-  
+
   if (params$keep_design_order == TRUE) {
     ## order sample to follow the original design file order
     diaNN_data <- diaNN_data[, c(diann_colname, design$Sample) ]
   }
   
   tryCatch( expr = {
-    
+    log_info('Creating Qfeature object ....')
     pe <- readQFeatures( diaNN_data,
                          fnames = "Precursor.Id",
                          quantCols =  str_detect(names(diaNN_data), paste( diann_colname , collapse = "|"), negate=TRUE) ,
                          name = "precursor")
     
+    if (params$keep_design_order == FALSE) {
+      design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
+      
+    }
+    log_info('Setting Qfeature ColData ....')
+    
     # add Coldata 
     colData(pe)$Group <- factor(design$Group)
     colData(pe)$SampleName <- design$Sample
-    
     #group column from design is now Group in coData(pe)
-    
     colData(pe)$Replicate <- factor(design$Replicate)
-    ## settinc confounder
-    custom_col <- setdiff(colnames(design),min_col_need_design )
-    
-    if (length(custom_col) >= 1){
-      log_info('Importing ConFounder in Q-feature ....')
-      for (col_add in custom_col){
+    # setting confounder
+    #custom_col <- setdiff(colnames(design),min_col_need_design )
+    if (! is_empty(params$confounder_list) ){
+        log_info('Importing ConFounder in Q-feature ColData ....')
+        for (col_add in params$confounder_list){
         
-        if  (is.character(design[[col_add]])) {
-          log_info(paste('Chr ', col_add))
-          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
-        }else{  
-          log_info(paste('Num ', col_add))
-          colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
-        }
-        
-      }
+          if (is.character(design[[col_add]])) {
+            log_info(paste('Type Chr - ', col_add))
+            colData(pe)[[col_add]]<- as.factor(design[[col_add]])
+            }else{  
+             log_info(paste('Type Num - ', col_add))
+             colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
+            }
+          }
+      
     }
-    
     return( list(error= '', status= 0,q_feat =pe ))
     
   }, error = function(err){
     print(paste("Q-feature err:  ",err))
     return( list(error= err, status= 1,q_feat =NULL )) 
   } )
-  
-  
 }
 
 

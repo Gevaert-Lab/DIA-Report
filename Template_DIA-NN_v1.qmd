@@ -177,7 +177,7 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  checkDIANN <- check_DIANN_report(_data, q_feature=params$quantitativefeatures)
+  checkDIANN <- check_DIANN_report(data, q_feature = params$quantitative_features)
     
   if (checkDIANN$status == 1 ) {
     stop(checkDIANN$error)
@@ -210,73 +210,17 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     }
   
 
- 
-  result_check <- check_design_data(dfMsqrob,design, min_featues =  min_col_need_design) 
-  
-  if (result_check$status == 1) {
-    stop(result_check$error)
-  }  
-  
-  
-  checkLength<-check_length_design_data(dfMsqrob, design)
-
-  if (checkLength$status==1){
-	  stop(checkLength$error)
-  }
-  
-  if (checkLength$status==2){
-    dfMsqrob <- checkLength$data_
-    log_info(checkLength$message)
-  #checkLength$message
-  }
-  
-  ## first check confounders in design file
-  if ( ! is_empty(params$confounder_list)  ) {
-    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
-    if (check_confounder_list$status == 1){
-        stop(check_confounder_list$error)
-    }
-  }
-  
-  ## Simple version   
-  # check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-  # if (check_groups$status == 1){
-  #     stop(check_groups$error)
-  # }
-  # 'Group' as in the metadata file
-  var2check <- 'Group'
-  if (! is_empty(params$confounder_list) ) {
-      var2check <- append(var2check,params$confounder_list)
-  }  
-  
-  checkVar_res <-checkVariables(inputParams =params$comparisons , 
-                                dfDesign = design, variables= var2check)
-  if (checkVar_res$status==1){
-  	stop(checkVar_res$error)
-  }
-
-  #  params$wildstr_run
-  
- samplenames <- tibble(
-   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob) ,   params$wildstr_run )  ]
-    ) 
-    
- 
-  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
-  # debugging
-  # names(a_wide)[str_which(names(a_wide), paste0('\\','CMB-'))] <- samplenames$sample
-  # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
-
-
-  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
- 
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
   
-  if (params$keep_design_order == TRUE) {
-      ## order sample to follow the original design file order
-  dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
-  }
+result_qfeat <-  import2_qfeature (dfMsqrob, design, params, min_col_need_design, diann_colname = diann_colname )
+
+if  (result_qfeat$status == 1){
+   stop(result_qfeat$error)
+}else{
+  
+  pe <- result_qfeat$q_feat
+}
   
 
 ```
@@ -285,80 +229,45 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 
 ```{r preparation }
 
-  log_info('Creating Qfeature object....')
+  
 
- pe <- readQFeatures( dfMsqrob,
-                     fnames = "Precursor.Id",
-                     ecol =  str_detect(names(dfMsqrob), paste( diann_colname , collapse = "|"), negate=TRUE) ,
-                     name = "precursor")
-
-
-
-
-   # if keep_design_order == fALSe
- # really important arrange w.r.t to the samplesnames$sample to preserve the right order
-
-  if (params$keep_design_order == FALSE) {
-    design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
-
-  }
- 
-colData(pe)$Group <- factor(design$Group)
-colData(pe)$SampleName <- design$Sample
-
-#group column from design is now Group in coData(pe)
-
-colData(pe)$Replicate <- factor(design$Replicate)
-
-custom_col <- setdiff(colnames(design),min_col_need_design )
-
-if (length(custom_col) >= 1){
-    log_info('Importing ConFounder....')
-    for (col_add in custom_col){
-       
-      if  (is.character(design[[col_add]])) {
-        log_info(paste('Chr ', col_add))
-          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
-      }else{  
-        log_info(paste('Num ', col_add))
-  	     colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
-      }
-      
-      }
-}
 
   check_confounder_PCA<-checkConfounder(confounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
 if (check_confounder_PCA$status == 1){
     stop(check_confounder_PCA$error)
 }
-rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
-  assay %>%
-  is.na %>%
-  not %>%
-  rowSums
 
-rowData(pe[["precursor"]])$pep_per_prot <-
-  left_join(rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
-            rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
-              summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
-
-## add statistics per group 
-group_val <- design %>% distinct(Group) %>% 
-              arrange(Group) %>%  pull()
-group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
-              arrange(Group) %>%  pull(n_)
-names(group_size) <- group_val
+pe <- add_rowdata_detection(pe,  design , assay = 'precursor' )
 
 
-
-for ( v in group_val){
-    log_info(v)
-    val = paste0('Zero',v)
-    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
-    ## 
-    val_due = paste0('perc',v)
-    rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
-}
+# rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
+#   assay %>%
+#   is.na %>%
+#   not %>%
+#   rowSums
+# 
+# rowData(pe[["precursor"]])$pep_per_prot <-
+#   left_join(rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
+#             rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
+#               summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
+# 
+# ## add statistics per group 
+# group_val <- design %>% distinct(Group) %>% 
+#               arrange(Group) %>%  pull()
+# group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
+#               arrange(Group) %>%  pull(n_)
+# names(group_size) <- group_val
+# 
+# 
+# 
+# for ( v in group_val){
+#     log_info(v)
+#     val = paste0('Zero',v)
+#     rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
+#     ## 
+#     val_due = paste0('perc',v)
+#     rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
+# }
 
 orig_nFeat <- dim(pe[['precursor']])[1]
 ```
@@ -377,56 +286,66 @@ The filtering steps applied are:
 
 size <- dim(colData(pe))[1]
 
-## filtering per group
 
-  if (params$filtPerGroup != '') {
-      log_info('filtering per group')
-    
-    ## or 
-   if (params$filtPerGroup == 'at_least_one') { 
-       log_info('filtering per group criteria: in at least one group ')
-       perc_group_val <- paste0("perc", group_val)
-       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
-       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
-   }
-    # and 
-    if (params$filtPerGroup == 'all') {
-        log_info('filtering per group criteria: for all the groups ')
-        perc_group_val <- paste0("perc", group_val)
-       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
-       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
-       }
-   
-   pe <-  filterFeatures(pe,dynamic_formula)
-    
+pe_ <- filteringNA_qfeat_proteinwf <- function(pe , parameters, design){
 
-   }else{
-        log_info('filtering across all samples')
-       pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
-
-  }  
+# 
+# group_val <- design %>% distinct(Group) %>% 
+#       arrange(Group) %>%  pull()
+#     group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
+#       arrange(Group) %>%  pull(n_)
+#     names(group_size) <- group_val
+# 
+# ## filtering per group
+# 
+#   if (params$filtPerGroup != '') {
+#       log_info('filtering per group')
+#     
+#     ## or 
+#    if (params$filtPerGroup == 'at_least_one') { 
+#        log_info('filtering per group criteria: in at least one group ')
+#        perc_group_val <- paste0("perc", group_val)
+#        formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
+#        dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+#    }
+#     # and 
+#     if (params$filtPerGroup == 'all') {
+#         log_info('filtering per group criteria: for all the groups ')
+#         perc_group_val <- paste0("perc", group_val)
+#        formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
+#        dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+#        }
+#    
+#    pe <-  filterFeatures(pe,dynamic_formula)
+#     
+# 
+#    }else{
+#         log_info('filtering across all samples')
+#        pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+# 
+#   }  
 
 # Proteotypic features
-if (params$Proteotypic){
-  log_info('Proteotypic filtering')
-
-  pe <- filterFeatures(pe, ~ Proteotypic == 1)
-
-}
-
-## filtering out contaminats
-
-if (params$filtering_contaminant){
-    log_info('Filtering contaminants')
-
-  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
-
-}
-
-# At least 2 peptides per protein across all groups
-log_info('Filtering only n peptides per proteins')
-
-pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
+# if (params$Proteotypic){
+#   log_info('Proteotypic filtering')
+# 
+#   pe <- filterFeatures(pe, ~ Proteotypic == 1)
+# 
+# }
+# 
+# ## filtering out contaminats
+# 
+# if (params$filtering_contaminant){
+#     log_info('Filtering contaminants')
+# 
+#   pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
+# 
+# }
+# 
+# # At least 2 peptides per protein across all groups
+# log_info('Filtering only n peptides per proteins')
+# 
+# pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
 
 
 log_info('Intensity log tranformation')
@@ -448,19 +367,13 @@ pe <- aggregateFeatures(pe, i = "precursorNorm",
                         na.rm = TRUE)
 
 log_info('Computing protein level % not missing')
-for ( v in group_val){
-    val = paste0('Zero',v)
-    log_info(val)
-    rowData(pe[["proteinRS"]])[[val]] <- assay(pe[["proteinRS"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
-    ## 
-    val_due = paste0('perc',v)
-    rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
-}
 
+pe <- add_rowdata_detection(pe,  design , assay = 'proteinRS' )
 
 
 
 ```
+
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
 
 ```{r adding_ensembl_annotation}
