@@ -13,101 +13,326 @@
 #' @return type_raw: format file of the raw file detected ,
 #' @error error: error message
 
-check_DIANN_report <- function(data_ , q_feature){
-  
-  status <- 0
-  error <-
-    ## check if precursor. translated is there  
-    min_precursor_col<- c("Precursor.Normalised","Precursor.Quantity",'Precursor.Translated')
-  if (! any (min_precursor_col %in% q_feature)==TRUE){
-    error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
-    
-    status <- 1
-    return( list(status=status,error=error))
-  }
-  
+# check_DIANN_report <- function(data_ , q_feature){
+#   
+#   status <- 0
+#   error <-
+#     ## check if precursor. translated is there  
+#     min_precursor_col<- c("Precursor.Normalised","Precursor.Quantity",'Precursor.Translated')
+#   if (! any (min_precursor_col %in% q_feature)==TRUE){
+#     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_precursor_col,sep='\n\n' ) )
+#     
+#     status <- 1
+#     return( list(status=status,error=error))
+#   }
+#   
  
-  min_col_need <- c("Proteotypic","PG.Q.Value",
-                    "Q.Value","Precursor.Id") %>% append(q_feature)
-  if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
-    
-    #cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' )  
-    error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' ) )
-    
-    status <- 1
-    #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
-    return( list(status=status, error=error))
-  }
-  
-  return(list(status=status))
-  
-}
+#   min_col_need <- c("Proteotypic","PG.Q.Value",
+#                     "Q.Value","Precursor.Id") %>% append(q_feature)
+#   if  ( ! all( min_col_need %in% colnames(data_)) == TRUE){
+#     
+#     #cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' )  
+#     error <-  capture.output( cat ( 'DIA-NN report not recognized. It should contains at least the following columns:',min_col_need,sep='\n\n' ) )
+#     
+#     status <- 1
+#     #error <-  paste( c('DIA-NN report not recognized. It should contains at least the following columns:',min_col_need) ,sep='\n\n' )
+#     return( list(status=status, error=error))
+#   }
+#   
+#   return(list(status=status))
+#   
+# }
+
 
 #' @author Andrea Argentini
-#' @title  filteringNA_qfeat_proteinwf
+#' @title  add_ensembl_annotation
 #'  
 #' @description
-#'This function adds number and percentage of non missing value for each group in assay specified.
-#' Moreover it adds computed the number of peptide per protien and the total number of non missing values.
+#' This function adds Ensembl annotation to the assay proteinRS in the q-feature object.
+#' Ensembl annotation file is csv file, that must include hgnc_symbol columns. Annotation columns indicated in 
+#' ensembl_col are included in the rowData(pe_[['proteinRS']]), joining the gene symbol present in DIA-NN report.
+#' hgnc_symbol information should be the same of the Genes column present in the DIA-NN, otherwise an error is throw.
 #' 
 #' @param pe_: q_feature object where to add rowdata
 #' @param parameters: EDF data frame 
-#' @param design: EDF data frame
-#' @return pe_: modified q-feature object
+#' @return status: int 0 non error  / 1 error found  
+#' @return q_feat: q-feature created / modified 
+#' @return error: error message 
+#' 
+add_ensembl_annotation  <-function (pe_, parameters ) {
+  ## read it 
+  ensembl_db_table <- read.csv(params$ensembl_annotation)
+  ## make it simple 
+  res_check <- check_columns_presence ( ensembl_db_table, min_features = c('hgnc_symbol')  )
+  
+  if (res_check$status == 0) {
+    ensembl_db_table <- ensembl_db_table %>%  
+        distinct(ensembl_gene_id , .keep_all=TRUE)  %>% 
+        dplyr::select( params$ensembl_col, hgnc_symbol  ) %>% 
+        distinct( hgnc_symbol, .keep_all=TRUE)
+    temp <- as.data.frame(rowData(pe_[['proteinRS']]))  %>% 
+            left_join( ensembl_db_table , join_by(Genes ==  hgnc_symbol)) 
+    
+    if (  intersect(temp$Genes, ensembl_db_table$hgnc_symbol)  == '' ){
+      return ( list( status= 1 , error= 'Join based hgnc_symbol and Genes did not work. Check you Ids or gene symbol'))
+      
+    }
+    
+     
+    if (dim(temp)[1] != dim(as.data.frame(rowData(pe_[['proteinRS']])) )[1] ){
 
-filteringNA_qfeat_proteinwf <- function(pe_ , parameters, design){
+      return ( list( status= 1 , error= 'Join based hgnc_symbol and Genes did not work. Check you Ids or gene symbol'))
+      
+    }else{
+      # adding information specified in  parameters$ensembl_col
+      ## hgnc_symbol should not included 
+      for (i in  1:(length( parameters$ensembl_col)) ){
+        ann_col <- params$ensembl_col[i]
+        
+        rowData(pe_[['proteinRS']])[[ann_col]] <- temp[[ann_col]]
+      }}
+  }else {
+    msg <-  capture.output(cat ( 'Annotation file not recognized. It should contains at least the following column: hgnc_symbol' ))
+    return ( list( status= 1 , error= msg))  
+  }
+  return ( list( status= 0 , error= '', q_feat = pe_))  
+}
+
+
+#' @author Andrea Argentini
+#' @title  processing_qfeat_protein
+#'  
+#' @description
+#' This function applies the following steps from precursor assays: 
+#' 1. Log2 transformation of the percursor intensities (assay name: precursorLog)
+#' 2. Normalization of log2transformed intensities based on params$normalization method (assay name: precursorNorm).
+#' 3. Protein summarization based on  aggr_method_f method (assay name: proteinRS)
+#' 
+#' @param pe_: q_feature object where to add rowdata
+#' @param parameters: EDF data frame 
+#' @param aggr_mth_fun function for protein summarization
+#' @return status: int 0 non error  / 1 error found  
+#' @return q_feat: q-feature created / modified 
+#' @return error: error message 
+
+processing_qfeat_protein <- function(pe_ , parameters, aggr_mth_fun ){
+  error <- ''
+  status <- 0
+  log_info(paste0('Assays in q-feat object: ', paste(names(pe_), collapse = ", ")) )
+  
+  log_info('Intensity log tranformation')
+  
+  tryCatch( expr = {
+    pe_ <- logTransform(pe_, base = 2, i = "precursor",
+                       name = "precursorLog")
+    
+  },error = function(err){
+    print(paste("Q-feature Log-trasformation:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+  # pe <- logTransform(pe, base = 2, i = "precursor",
+  #                    name = "precursorLog")
+  
+  
+  log_info('Normalization')
+  
+  tryCatch( expr = {
+    pe_ <- QFeatures::normalize(pe_,  method = params$normalization, i = "precursorLog",
+                               name = "precursorNorm")
+    
+  },error = function(err){
+    print(paste("Q-feature Normalization:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+
+  #MsCoreUtils::medianPolish()
+  log_info('Summarization at protein level')
+  
+  tryCatch( expr = {
+    pe_ <- aggregateFeatures(pe_, i = "precursorNorm",
+                            fcol = "Protein.Ids",
+                            name = "proteinRS",
+                            fun = aggr_mth_fun,
+                            na.rm = TRUE)
+    
+  },error = function(err){
+    print(paste("Q-feature Summarization:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+
+  
+  log_info(paste0('Assays in q-feat object: ', paste(names(pe_), collapse = ", ")) )
+  
+  return( list(error= '', status= 0, q_feat = pe_ )) 
+  
+}
+  
+
+#' @author Andrea Argentini
+#' @title  processing_qfeat_peptide
+#'  
+#' @description
+#' This function applies the following steps from precursor assay: 
+#' 1. Summarize precursor to peptide (stripped sequence) intensities using sum function (assay name PeptideRawSum)
+#' 1. Log2 transformation of the peptide intensities (assay name: peptideLog)
+#' 2. Normalization of log2transformed peptide intensities based on params$normalization method (assay name: peptideNorm).
+#' 
+#' @param pe_: q_feature object where to add rowdata
+#' @param parameters: EDF data frame 
+#' @param aggr_mth_fun function for protein summarization
+#' @return status: int 0 non error  / 1 error found  
+#' @return q_feat: q-feature created / modified 
+#' @return error: error message 
+
+processing_qfeat_peptide <- function(pe_ , parameters, aggr_mth_fun ){
+  error <- ''
+  status <- 0
+  log_info(paste0('Assays in q-feat object: ', paste(names(pe_), collapse = ", ")) )
+  
+  log_info('Summarization Precursor -> Peptide (Sum)')
+  
+
+  tryCatch( expr = {
+    pe_ <- aggregateFeatures(pe_, i = "precursor",
+                            fcol = "Stripped.Sequence",
+                            name = "PeptideRawSum",
+                            fun = base::colSums,
+                            # slower but better than medianPolish
+                            na.rm = TRUE)
+    
+  },error = function(err){
+    print(paste("Q-feature Summarization Precursor -> Peptide:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+  log_info('Intensity log tranformation')
+  
+  tryCatch( expr = {
+    pe_ <- logTransform(pe_, base = 2, i = "PeptideRawSum",
+                        name = "peptideLog")
+    pe_ <- infIsNA(pe_, i='peptideLog')
+    
+  },error = function(err){
+    print(paste("Q-feature Log-trasformation:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+  # pe <- logTransform(pe, base = 2, i = "precursor",
+  #                    name = "precursorLog")
+  
+  
+  log_info('Normalization')
+  
+  tryCatch( expr = {
+    pe_ <- QFeatures::normalize(pe_,  method = params$normalization, i = "peptideLog",
+                                name = "peptideNorm")
+    
+  },error = function(err){
+    print(paste("Q-feature Normalization:  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+  log_info(paste0('Assays in q-feat object: ', paste(names(pe_), collapse = ", ")) )
+  
+  return( list(error= '', status= 0, q_feat = pe_ )) 
+  
+}
+
+
+#' @author Andrea Argentini
+#' @title  filteringNA_qfeat_protein
+#'  
+#' @description
+#' This function adds number and percentage of non missing value for each group in assay specified.
+#' Moreover it adds computed the number of peptide per protein and the total number of non missing values.
+#' 
+#' @param pe_: q_feature object 
+#' @param parameters: EDF data frame 
+#' @param design: EDF data frame
+#' @return status: int 0 non error  / 1 error found  
+#' @return q_feat: q-feature created/ modified 
+#' @return error: error message 
+
+filteringNA_qfeat <- function(pe_ , parameters, design){
   group_val <- design %>% distinct(Group) %>% 
     arrange(Group) %>%  pull()
+  error <- ''
+  status <- 0
+  size <- dim(colData(pe_))[1]
+  
+  tryCatch( expr = {
+   
+    if (params$filtPerGroup != '') {
+      log_info('filtering per group')
+      
+      ## or 
+      if (params$filtPerGroup == 'at_least_one') { 
+        log_info('filtering per group criteria: in at least one group ')
+        perc_group_val <- paste0("perc", group_val)
+        formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
+        dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+      }
+      # and 
+      if (params$filtPerGroup == 'all') {
+        log_info('filtering per group criteria: for all the groups ')
+        perc_group_val <- paste0("perc", group_val)
+        formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
+        dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+      }
+      
+        pe_ <-  filterFeatures(pe_,dynamic_formula)
+    }else{
+        log_info('filtering across all samples')
+        pe_ <- filterFeatures(pe_, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+        
+      }  
+    
+  },error = function(err){
+    print(paste("Q-feature Filtering NaN :  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
+  
+  tryCatch( expr = {
+    if (params$Proteotypic){
+      log_info('Proteotypic filtering')
+      
+      pe_ <- filterFeatures(pe_, ~ Proteotypic == 1)
+      
+    }
+    
+  },error = function(err){
+    print(paste("Q-feature Protetypic :  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  } )
 
-  if (params$filtPerGroup != '') {
-    log_info('filtering per group')
-    
-    ## or 
-    if (params$filtPerGroup == 'at_least_one') { 
-      log_info('filtering per group criteria: in at least one group ')
-      perc_group_val <- paste0("perc", group_val)
-      formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
-      dynamic_formula <- as.formula(paste0("~ ", formula_condition))
-    }
-    # and 
-    if (params$filtPerGroup == 'all') {
-      log_info('filtering per group criteria: for all the groups ')
-      perc_group_val <- paste0("perc", group_val)
-      formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
-      dynamic_formula <- as.formula(paste0("~ ", formula_condition))
+  
+  tryCatch( expr = {
+    if (params$filtering_contaminant){
+      log_info('Filtering contaminants')
+
+      pe_ <- filterFeatures ( pe_ ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
     }
     
-    pe_ <-  filterFeatures(pe_,dynamic_formula)
+  },error = function(err){
+    print(paste("Q-feature Contaminant :  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  })
+
+  tryCatch( expr = {
     
+    log_info('Filtering only n peptides per protein')
     
-  }else{
-    log_info('filtering across all samples')
-    pe_ <- filterFeatures(pe_, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+    pe_ <- filterFeatures(pe_, ~ pep_per_prot > params$pep_per_prot)
     
-  }  
-  if (params$Proteotypic){
-    log_info('Proteotypic filtering')
-    
-    pe_ <- filterFeatures(pe_, ~ Proteotypic == 1)
-    
-  }
+  },error = function(err){
+    print(paste("Q-feature Num peptide Protein :  ",err))
+    return( list(error= err, status= 1,q_feat =NULL )) 
+  })
   
-  ## filtering out contaminats
-  
-  if (params$filtering_contaminant){
-    log_info('Filtering contaminants')
-    
-    pe_ <- filterFeatures ( pe_ ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
-    
-  }
-  
-  # At least 2 peptides per protein across all groups
-  log_info('Filtering only n peptides per proteins')
-  
-  pe_ <- filterFeatures(pe_, ~ pep_per_prot > params$pep_per_prot)
-  
-  return(pe_)
-  
+
+  return( list(error= '', status= 0,q_feat = pe_ ))   
 } 
 
 
@@ -116,7 +341,7 @@ filteringNA_qfeat_proteinwf <- function(pe_ , parameters, design){
 #'  
 #'  
 #' @description
-#'This function adds number and percentage of non missing value for each group in assay specified.
+#' This function adds number and percentage of non missing value for each group in assay specified.
 #' Moreover it adds computed the number of peptide per protien and the total number of non missing values.
 #' 
 #' @param pe_: q_feature object where to add rowdata
@@ -125,7 +350,7 @@ filteringNA_qfeat_proteinwf <- function(pe_ , parameters, design){
 #' @return pe_: modified q-feature object
 
 add_rowdata_detection <- function ( pe_ , design , assay ){
-    if (assay == 'precursor'){
+    if (assay == 'precursor' | assay == 'peptideNorm'){
       log_info(paste0('Computing extra info (nNonZero) at ', assay, ' ...'))
       
       rowData(pe_[[assay]])$nNonZero <- pe_[[assay]] %>%
@@ -170,25 +395,29 @@ add_rowdata_detection <- function ( pe_ , design , assay ){
 #'  
 #' report 
 #' @description
-#'This function checks some main sanity controls for the data retrieved in DIA.
-#'Remark : Model result are supposed to be in proteinRS layer.
+#' This function create an q-feature obj, containing the DIA-NN precursor intensities in the assay precursor.
+#' ColData is also set with the experiment design information. Several sanity checks are performed like: 
+#' 1)  columns present in design file 
+#' 2)  check number and  sample name found in the DIA-NN report and in the design file 
+#' 3) check confounder variable present in the design file
+#' Finally name matching between run in DIA-report andin the design file is done, 
+#' using params$wildstr_run to select the run name among the the other information columns
 #' 
 #' @param diaNN_data: data frame containing the DIA-NN in a wide format
 #' @param params: list of parameters
 #' @param min_col_need_design: list of the mandatory fields in EDF file
 #' @param diann_colname: columns names 
 #' @return status: int 0 non error  / 1 error found  
-#' @return q_feat: q-feature created ,
+#' @return q_feat: q-feature created/ modified 
 #' @return error: error message  
 import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, diann_colname ){
   
   log_info('Check EDF file information ...')
-  result_check <- check_design_data(diaNN_data,design, min_featues =  min_col_need_design) 
+  result_check <- check_columns_presence (design, min_features =  min_col_need_design ) 
   
   if (result_check$status == 1) {
-    
-    return( list(error= result_check$error, status= result_check$status,q_feat =NULL ))   
-    
+    msg <- paste('Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n' )
+    return( list(error= msg, status= result_check$status, q_feat =NULL ))   
   }  
   
   log_info('Check Sample names and their number in DIA-NN and EDF ...')
@@ -217,7 +446,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
     }
   }
   
-  log_info('Check comparisons withEDF ...')
+  log_info('Check comparisons with EDF ...')
   var2check <- 'Group'
   if (! is_empty(params$confounder_list) ) {
     var2check <- append(var2check,params$confounder_list)
@@ -241,7 +470,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
 
   names(diaNN_data)[str_which(names(diaNN_data),  params$wildstr_run ) ] <- samplenames$Sample
 
-  if (params$keep_design_order == TRUE) {
+  if ( !is.null(params$keep_design_order) && (params$keep_design_order == TRUE) ) {
     ## order sample to follow the original design file order
     diaNN_data <- diaNN_data[, c(diann_colname, design$Sample) ]
   }
@@ -253,7 +482,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
                          quantCols =  str_detect(names(diaNN_data), paste( diann_colname , collapse = "|"), negate=TRUE) ,
                          name = "precursor")
     
-    if (params$keep_design_order == FALSE) {
+    if ( !is.null(params$keep_design_order) && (params$keep_design_order == FALSE)) {
       design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
       
     }
@@ -291,33 +520,30 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
 
   
   #' @author Andrea Argentini
-  #' @title check_design_data
+  #' @title check_columns_presence
   #' @description This function checks some main sanity controls in the design file 
   #' e.g. Name of columns, min available columns.
-  #' @param data_: data frame containing the DIA-NN report data
   #' @param design: data frame containing experiment design data 
   #' @return status : int 0 / 1 error found  
   #' @return type_raw: format file of the raw file detected ,
   #' @error error: error message
  
-check_design_data  <- function  (data_ , design, min_featues){
+check_columns_presence  <- function  ( df, min_features){
   status <- 0
   #type_raw <- NA
-  error <-
+  error <- ''
     
-  data_sample <- colnames(data_)[10:length(colnames(data_))]
 
-  if  ( ! all( min_featues %in% colnames(design)) == TRUE){
+  if  ( ! all( min_features %in% colnames(df)) == TRUE){
     #cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' )  
     #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
-    error <-  capture.output(cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' ))
+    error <- 'Placeholder'  
     status <- 1
     return(list(status=status ,error=error))
   }
   
-  #type_raw <- str_match(data_sample,'\\..*')[,1][1]
-  
-  return(list(status=status))
+
+  return(list(status=status, error= ''))
   
 }
 
@@ -552,22 +778,8 @@ dep_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
   all_res$differential_expressed[all_res$logFC <= params$FC_thr & all_res$adjPval < params$adjpval_thr] <- "DOWN"
   #sprintf("Protein_name: %s<br> Gene: %s", all_res$Protein.names, all_res$Gene_symbol)
   
-  if ( ! params$ensembl_annotation == '') {
-    ## adding ensemble annotation
-    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
-                                      text = sprintf("Protein_name: %s <br> Gene_symbol: %s  <br> Chromosome name: %s",   all_res$Protein.Names, all_res$Genes,all_res$chromosome_name)   )  )  +
-      geom_point() +
-      theme_minimal() +
-      #geom_text_repel() +
-      geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
-      geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
-      scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
-      ggtitle(paste0("Volcano ",cmp) )
     
-    DEall <- all_res[!is.na(all_res$adjPval) ,append(c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC","differential_expressed",perc_field),head(params$ensembl_col,-1) ) ]
-  }else{
-    
-    p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
+  p1 <- ggplot(data = all_res , aes(x = logFC, y = -log10(pval) ,col=differential_expressed , 
                                       text = sprintf("Protein_name: %s <br> Gene_symbol: %s", all_res$Protein.Names, all_res$Genes)   )  )  +
       geom_point() +
       theme_minimal() +
@@ -580,7 +792,7 @@ dep_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
    
     DEall <- all_res[!is.na(all_res$adjPval) , c('precursor_id',  "Protein.Names" , "Genes", "adjPval","pval","logFC", "differential_expressed",perc_field)]
     
-  }
+  
   all_res_file <- all_res %>%  mutate( Gene_v =  case_when( str_detect(Genes, ";") ~ str_split(Genes, ";", simplify = TRUE)[, 1],
                                                         TRUE ~ Genes)) %>%  
     mutate( label_DE = case_when( differential_expressed == 'UP' ~ paste(Gene_v,precursor_id,sep='_'), 
