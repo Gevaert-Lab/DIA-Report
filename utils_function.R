@@ -422,7 +422,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
   
   log_info('Check Sample names and their number in DIA-NN and EDF ...')
   
-  checkLength<- check_length_design_data(dfMsqrob, design)
+  checkLength<- check_length_design_data(diaNN_data, design)
   
   if (checkLength$status==1){
 
@@ -575,7 +575,7 @@ check_length_design_data  <- function  (data_ , design){
     return(list(status=status,error=error,message=message))
   }
   
-  if (!any(d_sample %in% data_sample)){
+  if (length(data_sample[!d_sample %in% data_sample]) >= 1){
     error <- 'Samples in the design file and in DIA-NN do not match'
     status <- 1
     return(list(status=status,error=error,message=message))	
@@ -583,9 +583,9 @@ check_length_design_data  <- function  (data_ , design){
   ### pay attention here 
   if (length(data_sample) > length(d_sample)){
     status <- 2
-    dfSample<- dfMsqrob[,(colnames(dfMsqrob)%in% d_sample)]
+    dfSample<- data_[,(colnames(data_)%in% d_sample)]
     ## "First.Protein.Description" on hold for the moment
-    df  <- cbind(dfMsqrob[, c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
+    df  <- cbind(data_[, c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
                         "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")], dfSample)
     message <- 'Number of samples in DIA-NN is bigger than number of samples in design file.'
     return(list(status=status, error = error, message=message , data_ = df))
@@ -802,14 +802,13 @@ dep_volcano_peptide <- function ( label, data , imagesDir ,p= params ){
     
   p_toFile <- ggplot(data = all_res_file , aes(x = logFC, y = -log10(pval) ,col=differential_expressed 
                                            ,label = label_DE )  )  +
-    geom_point() +
-    geom_text_repel() +
-    geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
-    geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
-    scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
-    ggtitle(paste0("Volcano ",cmp) )
+  geom_point() +
+  geom_text_repel() +
+  geom_vline(xintercept = c(- params$FC_thr, params$FC_thr),col="grey") +
+  geom_hline(yintercept = -log10(params$adjpval_thr),col="grey") +
+  scale_color_manual(values=c("DOWN"="blue","NO"="black", "UP"="red"))+
+  ggtitle(paste0("Volcano ",cmp) )
 
-  
   return ( list( toptable =DEall , volcano = p1, volcano2file =p_toFile ) )
 }
 
