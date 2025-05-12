@@ -33,7 +33,6 @@ The statistical analysis is powered by **MSQrob2** and **Qfeatures** packages, a
 
     ``` r
     install.packages("BiocManager")
-    BiocManager::install("required_packages")
     ```
 
 2.  Install phantomjs:

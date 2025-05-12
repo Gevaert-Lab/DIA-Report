@@ -141,18 +141,15 @@ if (!dir.exists(file.path(params$folder_prj))){
   dir.create(file.path( params$folder_prj),recursive = TRUE)
 }
  dir.create(file.path( params$folder_prj, "Result"),recursive = TRUE)
- min_col_need_design <- c("Sample","Run", "Group", "Replicate")
+ min_info_design <- c("Sample","Run", "Group", "Replicate")
 
- 
- 
+
  theme_set(theme_custom_vis())
  
  st=format(Sys.time(), "%Y%m%d_%H%M")
 
 write(as.yaml(params), file =  file.path( params$folder_prj, paste0("DIAReport_parameter_",st  , ".yaml")))
 
- 
- 
 ```
 
 ## Import data
@@ -165,43 +162,43 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 ```{r import data}
 
   if (params$DIANN_ver2){
-     log_info('Reading Data PARQUET format...')
+     log_info('Reading DIA-NN PARQUET format...')
      data <- read_parquet(params$input_file)
      lst_wide_columns <- c('Run', 'Precursor.Id', 'Modified.Sequence', 'Stripped.Sequence', 'Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes', 'Proteotypic')
      
   }else{
-     log_info('Reading Data TSV format...')
+     log_info('Reading DIA-NN TSV format...')
      data <- read.csv(params$input_file,sep='\t')
      lst_wide_columns <- c('Run', 'Precursor.Id', 'Modified.Sequence', 'Stripped.Sequence', 'Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes', 'Proteotypic','First.Protein.Description')
 
   }
  
-  ## deal csv  with different separated values 
+  ## read design 
   L <- readLines(params$design_file, n = 1)
   if (grepl(";", L)) design <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
 
-  checkDIANN <- check_DIANN_report(data, q_feature=params$quantitative_features)
-    
+  checkDIANN <- check_columns_presence(data , min_features = append(lst_wide_columns, params$quantitative_features))
   if (checkDIANN$status == 1 ) {
+   checkDIANN$error <- paste( 'DIA-NN report not recognized. It should contains at least the following columns:',params$quantitative_features,sep='\n')
     stop(checkDIANN$error)
     } 
-  
-
+ 
+   ##  make a wide format
   dfMsqrob <- dfToWideMsqrob_20( data, precursorquan = params$quantitative_features, mbr = params$mbr, wide_colums = lst_wide_columns)
 
-
+  
   if (params$DIANN_ver2){
     log_info('Retrieve Protein description (ver > 2.0)...')
     
     check_protein_desc <-  detect_file_in_folder(file.path(dirname(params$input_file)),
                                                   'report.protein_description.tsv')
-    log_info(check_protein_desc)
-    log_info( file.path(dirname(params$input_file),check_protein_desc))
+    #log_info(check_protein_desc)
+    #log_info( file.path(dirname(params$input_file),check_protein_desc))
     if (check_protein_desc != ""){
       prt_desc <- read.csv( file.path(dirname(params$input_file),check_protein_desc),sep="\t"  )
        
     }else{
-       stop(paste0('file ','report.protein_description.tsv',  'not found in folder ->',
+       stop(paste0('report.protein_description.tsv',  'not found in folder ->',
        	            dirname(params$input_file),'\n',' Check your input path !' ))
     }
 
@@ -213,73 +210,16 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
     }
   
 
- 
-  result_check <- check_design_data(dfMsqrob,design, min_featues =  min_col_need_design) 
-  
-  if (result_check$status == 1  ){
-    stop(result_check$error)
-  }  
-  
-  
-  checkLength<-check_length_design_data(dfMsqrob, design)
-
-  if (checkLength$status==1){
-	stop(checkLength$error)
-  }
-  
-  if (checkLength$status==2){
-  dfMsqrob <- checkLength$data_
-  log_info(checkLength$message)
-  #checkLength$message
-  }
-  
-  ## first check confounders in design file
-  if ( ! is_empty(params$confounder_list)  ) {
-    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
-    if (check_confounder_list$status == 1){
-        stop(check_confounder_list$error)
-    }
-  }
-  
-  ## Simple version   
-  # check_groups<-checkGroups(inputParams= params$comparisons, dfDesign=design)
-  # if (check_groups$status == 1){
-  #     stop(check_groups$error)
-  # }
-  # 'Group' as in the metadata file
-  var2check <- 'Group'
-  if (! is_empty(params$confounder_list) ){
-      var2check <- append(var2check,params$confounder_list)
-  }  
-  
-  checkVar_res <-checkVariables(inputParams =params$comparisons , 
-                                dfDesign = design, variables= var2check)
-  if (checkVar_res$status==1){
-  	stop(checkVar_res$error)
-  }
-
-  #  params$wildstr_run
-  
- samplenames <- tibble(
-   base_name_sample = names(dfMsqrob)[str_which(names(dfMsqrob),   params$wildstr_run )  ]
-    ) 
-    
- 
-  samplenames <- samplenames %>% left_join(  design %>% dplyr::select(Run, Sample) , join_by(base_name_sample ==  Run) )
-  # debugging
-  # names(a_wide)[str_which(names(a_wide), paste0('\\','CMB-'))] <- samplenames$sample
-  # names(b_wide)[str_which(names(b_wide), paste0('\\','_DIA'))] <- samplenames$sample
-
-
-  names(dfMsqrob)[str_which(names(dfMsqrob),  params$wildstr_run ) ] <- samplenames$Sample
- 
   diann_colname <- c("Precursor.Id" , "Modified.Sequence","Stripped.Sequence","Protein.Group",
   "Protein.Ids","Protein.Names","Genes","Proteotypic","First.Protein.Description")
-  
-  if (params$keep_design_order == TRUE) {
-      ## order sample to follow the original design file order
-  dfMsqrob <- dfMsqrob[, c(diann_colname, design$Sample) ]
-  }
+## create q-feature obj from dia-NN and design  
+result_qfeat <-  import2_qfeature (dfMsqrob, design, params, min_info_design, diann_colname = diann_colname )
+
+if  (result_qfeat$status == 1){
+   stop(result_qfeat$error)
+}else{
+  pe <- result_qfeat$q_feat
+}
   
 
 ```
@@ -288,80 +228,17 @@ Reading DIA data from **`r basename(params$input_file)`** using *`r params$quant
 
 ```{r preparation }
 
-  log_info('Creating Qfeature object....')
+  
 
- pe <- readQFeatures( dfMsqrob,
-                     fnames = "Precursor.Id",
-                     ecol =  str_detect(names(dfMsqrob), paste( diann_colname , collapse = "|"), negate=TRUE) ,
-                     name = "precursor")
-
-
-
-
-   # if keep_design_order == fALSe
- # really important arrange w.r.t to the samplesnames$sample to preserve the right order
-
-  if (params$keep_design_order == FALSE) {
-    design <- design %>%  arrange(factor(Sample, levels = samplenames$Sample))
-
-  }
- 
-colData(pe)$Group <- factor(design$Group)
-colData(pe)$SampleName <- design$Sample
-
-#group column from design is now Group in coData(pe)
-
-colData(pe)$Replicate <- factor(design$Replicate)
-
-custom_col <- setdiff(colnames(design),min_col_need_design )
-
-if (length(custom_col) >= 1){
-    log_info('Importing ConFounder....')
-    for (col_add in custom_col){
-       
-      if  (is.character(design[[col_add]])) {
-        log_info(paste('Chr ', col_add))
-          colData(pe)[[col_add]]<- as.factor(design[[col_add]])
-      }else{  
-        log_info(paste('Num ', col_add))
-  	     colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
-      }
-      
-      }
-}
-
-  check_confounder_PCA<-checkConfounder(confounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
+## we can use check_columns_presence to-do 
+check_confounder_PCA<-checkConfounder(confounder= unique(unlist(str_split(params$PCA_comparison, "-"))), colsDesign=colnames(colData(pe)))
 if (check_confounder_PCA$status == 1){
     stop(check_confounder_PCA$error)
 }
-rowData(pe[["precursor"]])$nNonZero <- pe[["precursor"]] %>%
-  assay %>%
-  is.na %>%
-  not %>%
-  rowSums
 
-rowData(pe[["precursor"]])$pep_per_prot <-
-  left_join(rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::select(Protein.Ids),
-            rowData(pe[["precursor"]]) %>% as.data.frame %>% dplyr::group_by(Protein.Ids) %>%
-              summarise(pep_per_prot = length(unique(Stripped.Sequence))))$pep_per_prot
-
-## add statistics per group 
-group_val <- design %>% distinct(Group) %>% 
-              arrange(Group) %>%  pull()
-group_size <- design  %>% group_by(Group) %>% summarise(n_=n()) %>% 
-              arrange(Group) %>%  pull(n_)
-names(group_size) <- group_val
+pe <- add_rowdata_detection(pe,  design , assay = 'precursor' )
 
 
-
-for ( v in group_val){
-    log_info(v)
-    val = paste0('Zero',v)
-    rowData(pe[["precursor"]])[[val]] <- assay(pe[["precursor"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
-    ## 
-    val_due = paste0('perc',v)
-    rowData(pe[["precursor"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["precursor"]])[[val]] ) / group_size[[v]]) *  100
-}
 
 orig_nFeat <- dim(pe[['precursor']])[1]
 ```
@@ -376,117 +253,61 @@ The filtering steps applied are:
 
 
 
-```{r pre_processing}
+```{r filtering_processing}
 
-size <- dim(colData(pe))[1]
+res_filt <- filteringNA_qfeat(pe , params, design)
 
-## filtering per group
+if  (res_filt$status == 1){
+    stop(res_filt$error)
+  }else{
+  
+    pe <- res_filt$q_feat
+  }
 
-  if (params$filtPerGroup != '') {
-      log_info('filtering per group')
-    
-    ## or 
-   if (params$filtPerGroup == 'at_least_one') { 
-       log_info('filtering per group criteria: in at least one group ')
-       perc_group_val <- paste0("perc", group_val)
-       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " | ")
-       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
-   }
-    # and 
-    if (params$filtPerGroup == 'all') {
-        log_info('filtering per group criteria: for all the groups ')
-        perc_group_val <- paste0("perc", group_val)
-       formula_condition <- paste(paste0(perc_group_val, " >= ", params$nNonZero), collapse = " & ")
-       dynamic_formula <- as.formula(paste0("~ ", formula_condition))
-       }
-   
-   pe <-  filterFeatures(pe,dynamic_formula)
-    
+  
+  
+result_process <- processing_qfeat_protein(pe, params,aggr_method_f )  
+  
+if  (result_process$status == 1){
+    stop(result_process$error)
+  }else{
+    pe <- result_process$q_feat
+  }
 
+pe <- add_rowdata_detection(pe,  design , assay = 'proteinRS' )
+
+
+if ( ! params$ensembl_annotation == ''){
+   res_ensembl <- add_ensembl_annotation(g_annEn, params)
+   if (res_ensembl$status== 0){
+     pe <- res_ensembl$q_feat
    }else{
-        log_info('filtering across all samples')
-       pe <- filterFeatures(pe, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
-
-  }  
-
-# Proteotypic features
-if (params$Proteotypic){
-  log_info('Proteotypic filtering')
-
-  pe <- filterFeatures(pe, ~ Proteotypic == 1)
+     stop(res_ensembl$error)
+   }
 
 }
-
-## filtering out contaminats
-
-if (params$filtering_contaminant){
-    log_info('Filtering contaminants')
-
-  pe <- filterFeatures ( pe ,VariableFilter("Protein.Ids", params$contaminat_str, "contains", not=TRUE))
-
-}
-
-# At least 2 peptides per protein across all groups
-log_info('Filtering only n peptides per proteins')
-
-pe <- filterFeatures(pe, ~ pep_per_prot > params$pep_per_prot)
-
-
-log_info('Intensity log tranformation')
-
-pe <- logTransform(pe, base = 2, i = "precursor",
-                   name = "precursorLog")
-log_info('Normalization')
-
-
-pe <- QFeatures::normalize(pe,  method = params$normalization, i = "precursorLog",
-                name = "precursorNorm")
-#MsCoreUtils::medianPolish()
-log_info('Summarization at protein level')
-
-pe <- aggregateFeatures(pe, i = "precursorNorm",
-                        fcol = "Protein.Ids",
-                        name = "proteinRS",
-                        fun = aggr_method_f,
-                        na.rm = TRUE)
-
-log_info('Computing protein level % not missing')
-for ( v in group_val){
-    val = paste0('Zero',v)
-    log_info(val)
-    rowData(pe[["proteinRS"]])[[val]] <- assay(pe[["proteinRS"]])[,rownames(colData(pe)[colData(pe)$Group == v,]),drop = FALSE]  %>% is.na  %>% rowSums()
-    ## 
-    val_due = paste0('perc',v)
-    rowData(pe[["proteinRS"]])[[val_due]] <- ((group_size[[v]] - rowData(pe[["proteinRS"]])[[val]] ) / group_size[[v]]) *  100
-}
-
-
-
+saveRDS(pe, 'test_qfeatUPS.Rds')
 
 ```
+
+
 The initial number of precursor features  was **`r orig_nFeat`**, after filtering  **`r dim(pe[['precursor']])[1]`** features are retained.
 
-```{r adding_ensembl_annotation}
-if ( ! params$ensembl_annotation == ''){
-  ## read it 
-  ensembl_db_table <- read.csv(params$ensembl_annotation)
-  ## make it simple 
+
+```{r Confanalysis_title, results='asis'}
+
+if ( ! is_empty(params$confounder_list)  )  {
   
-  ensembl_db_table <- ensembl_db_table %>%  distinct(ensembl_gene_id , .keep_all=TRUE)  %>% 
-      dplyr::select( params$ensembl_col    ) %>% distinct( hgnc_symbol, .keep_all=TRUE)
-  app <- as.data.frame(rowData(pe[['proteinRS']]))  %>%  left_join( ensembl_db_table , join_by(Genes ==  hgnc_symbol)) 
+  header <- "Confounder Analysis"
   
-  for (i in  1:(length( params$ensembl_col) -1) ){
-     ann_col <- params$ensembl_col[i]
-     
-     rowData(pe[['proteinRS']])[[ann_col]] <- app[[ann_col]]
-  }
- 
+  cat('##', header, '\n\n')
+  
+  
 }
 
 ```
 
-## Confounder Analysis
+
 ```{r confounder_value_analysis}
 log_info('Confounder Analysis')
 cData<-as.data.frame(colData(pe))
@@ -648,20 +469,18 @@ log_info('Completness Analysis...')
 
 # to do make in for loop for a set of variable
 log_info('PCA Analysis...')
-var_topca <- params$PCA_comparison
 
-l_pca <- generate_pca_plots(var_topca, pe, params, layer ='proteinRS' )
-if (length(l_pca) == 0){
-  stop('Error during PCA generation ')
+res_pca  <- generate_pca_plots( pe, params, layer ='proteinRS' )
+
+if (any (res_pca$status == 1) ){
+  log  (paste('PCA plots :  one splot will be skipped: ', res_pca$msgs[ which(res_pca$status==1)]))
 }
-#ggplotly(  l_pca[[1]])
-
-#htmltools::tagList(l_pca)
-# saveRDS(l_pca, 'pcaPlot.Rds')
+l_pca <- res_pca$plots 
  for (pca_plot in l_pca ){
-   
+  if (is.null(pca_plot)){
+    next
+  }
   print(htmltools::tagList(ggplotly(pca_plot)))
-   #ggplotly(pca_plot)
  }
 
 ```
