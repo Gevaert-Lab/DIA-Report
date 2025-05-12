@@ -285,7 +285,9 @@ filteringNA_qfeat <- function(pe_ , parameters, design){
         pe_ <-  filterFeatures(pe_,dynamic_formula)
     }else{
         log_info('filtering across all samples')
-        pe_ <- filterFeatures(pe_, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
+        formula <- as.formula( paste0("~ nNonZero >= ", round(size  * ( params$nNonZero / 100))) )
+        pe_ <- filterFeatures(pe_, formula)
+        #pe_ <- filterFeatures(pe_, ~ nNonZero >= round(size  * ( params$nNonZero / 100))   )
         
       }  
     
@@ -297,8 +299,9 @@ filteringNA_qfeat <- function(pe_ , parameters, design){
   tryCatch( expr = {
     if (params$Proteotypic){
       log_info('Proteotypic filtering')
-      
-      pe_ <- filterFeatures(pe_, ~ Proteotypic == 1)
+      formula <- as.formula( paste0("~ Proteotypic == 1") )
+      pe_ <- filterFeatures(pe_, formula )
+      #pe_ <- filterFeatures(pe_, ~ Proteotypic == 1)
       
     }
     
@@ -323,8 +326,8 @@ filteringNA_qfeat <- function(pe_ , parameters, design){
   tryCatch( expr = {
     
     log_info('Filtering only n peptides per protein')
-    
-    pe_ <- filterFeatures(pe_, ~ pep_per_prot > params$pep_per_prot)
+    formula <- as.formula( paste0("~   pep_per_prot >= ", params$pep_per_prot) )
+    pe_ <- filterFeatures(pe_, formula )
     
   },error = function(err){
     print(paste("Q-feature Num peptide Protein :  ",err))
@@ -437,11 +440,13 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
   
   ## first check confounders in design file
   log_info('Check confounder in EDF ...')
-  
   if ( ! is_empty(params$confounder_list)  ) {
-    check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
+    check_confounder_list <- check_columns_presence( df = design,  min_features =  params$confounder_list)
+    #check_confounder_list<-checkConfounder(confounder= params$confounder_list, colsDesign=colnames(design))
     if (check_confounder_list$status == 1){
-      return( list(error= check_confounder_list$error, status= check_confounder_list$status,q_feat =NULL ))   
+      msg <- paste('Confounder not found in the design file -> ',params$confounder_list,sep='\n' )
+      
+      return( list(error= msg, status= check_confounder_list$status,q_feat =NULL ))   
       
     }
   }
@@ -456,7 +461,7 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
                                 dfDesign = design, variables= var2check)
   if (checkVar_res$status==1){
     #stop(checkVar_res$error)
-    return( list(error= checkVar_res$error, status= checkVar_res$status,q_feat =NULL ))   
+    return( list(error= checkVar_res$error, status= checkVar_res$status,q_feat = NULL ))   
   }
   
   #  params$wildstr_run
@@ -507,7 +512,6 @@ import2_qfeature <- function (diaNN_data, design, params, min_col_need_design, d
              colData(pe)[[col_add]] <-  as.numeric(design[[col_add]])
             }
           }
-      
     }
     return( list(error= '', status= 0,q_feat =pe ))
     
@@ -535,6 +539,7 @@ check_columns_presence  <- function  ( df, min_features){
     
 
   if  ( ! all( min_features %in% colnames(df)) == TRUE){
+    log_info(length(colnames(df) ))
     #cat ( 'Design file not recognized. It should contains at least the following columns:',min_col_need_design,sep='\n\n' )  
     #error <-  paste( c('Design file not recognized. It should contains at least the following columns:', paste(min_col_need_design,sep=' ')) ,sep=',' )
     error <- 'Placeholder'  
@@ -963,27 +968,7 @@ checkGroups<- function (inputParams, dfDesign){
   
 }
 
-#' @author Caterina Lizzio
-#' @title checkConfounder
-#' @description
-#' This function checks if confounder values in input are present in design file
-#' @param confounder: confounder values in input 
-#' @param colsDesign: colnames in design data 
-#' @return status : int 0 / 1 error found  
-#' @error error: error message
-checkConfounder<- function (confounder, colsDesign) {
 
-  if (! all (confounder %in%  colsDesign))  { 
-    error <-  capture.output( cat ( 'confounder values are not present in design file' ) )
-    status <- 1
-    return( list(status=status,error=error))
-  } else {
-    status <- 0
-    return( list(status=status,error=""))
-    
-  }
-
-}
 
 #' @author Andrea Argentini
 #' @title theme_custom_vis
@@ -1018,15 +1003,20 @@ theme_custom_vis <- function(base_size = 12) {
 #' - Numerical  and   Character | Factor  (e.g Group-BMI)
 #' - Character | Factor (single variable) (e.g Group, Replicates)
 #' ggplots generated are returned in a list , and printed in PDF inside the function
-#' @param var_topca List of variables to use it color/shape samples in the PCA plots
 #' @param pe Q-features object
 #' @param params List  of the current run
 #' @param layer Layer of the Q-features object to use for the PCA 
 #' @return output_plot List of ggplots generated for plotly visualization
+#' @return state 0 means ok , 1 means  not allowed combination
+#' @return output_msg text description of variable type used for debug purposes
 
-generate_pca_plots <- function(var_topca, pe, params, layer) {
+generate_pca_plots <- function( pe, params, layer,  test_skip= FALSE ) {
   # Define a fixed color palette
+  
+  var_topca <- params$PCA_comparison
   output_plot<- list()
+  output_msg<- list()
+  output_state <- list()
   for (i in seq_along(var_topca)) { # Iterate using index
     v <- var_topca[i] # Access element by index
     log_info(v)
@@ -1047,7 +1037,7 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
       
       pca_ <- ggplot(data = data.frame(prcompPe$x, SampleName= colData(pe)[['SampleName']],
                                        single_comp = colData(pe)[[single_comp]])  ) +
-        ggtitle(paste0("PCA by ", v)) +
+        ggtitle(paste0("PCA by ", single_comp)) +
        
         geom_point(aes(x = PC1, y = PC2, colour = factor(single_comp),
                                    text = paste("Sample:", SampleName)), size = 3 ) +
@@ -1057,18 +1047,23 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
       
       #plot(pca_)
       output_plot[[i]] <- pca_ # Assign plot to list element
+      output_msg[[i]] <- 'PCA single variable'
+      output_state[[i]] <- 0
       
       log_info(file.path(params$folder_prj, "Result"))
-      pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
-      plot(pca_)
-      
-      invisible(dev.off())
+      if ( test_skip == FALSE){
+        pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
+        plot(pca_)
+        
+        invisible(dev.off())
+      } 
+  
       
     } else if (length(comparisonPCA) == 2) {
       # Handle two variables case
       first_comp <- comparisonPCA[1]
       second_comp <- comparisonPCA[2]
-      log_info('2 variable -> Same type ')
+      log_info('2 variables -> Same type ')
       
       
       if (class(colData(pe)[[first_comp]]) == class(colData(pe)[[second_comp]])) {
@@ -1087,16 +1082,22 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
             labs(colour = first_comp, shape = second_comp)
           
           output_plot[[i]] <- pca_ # Assign plot to list element
-         
+          output_msg[[i]] <- 'PCA two variables are both categorical'
+          output_state[[i]] <- 0
           
           log_info(file.path(params$folder_prj, "Result"))
+          if ( test_skip == FALSE){
           pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
           plot(pca_)
           
           invisible(dev.off())
+          }
         } else {
           # Both are numeric variables
           log_info('I m breaking')
+          output_plot[[i]] <- NULL
+          output_msg[[i]] <- 'PCA two variable are both numeric NOT ALLOWED '
+          output_state[[i]] <- 1
           break
         }
       } else {
@@ -1125,16 +1126,20 @@ generate_pca_plots <- function(var_topca, pe, params, layer) {
         
         #plot(pca_)
         output_plot[[i]] <- pca_ # Assign plot to list element
+        output_msg[[i]] <- 'PCA two variables are numeric and categorical '
+        output_state[[i]] <- 0
         
         log_info(file.path(params$folder_prj, "Result"))
-        pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
-        plot(pca_)
-        
-        invisible(dev.off())
+        if ( test_skip == FALSE){
+          pdf(file = file.path(params$folder_prj, "Result", paste0("PCA by ", v, ".pdf")), paper = "a4")
+          plot(pca_)
+          
+          invisible(dev.off())
+        }
       }
     }
   }
-  return (output_plot)
+  return ( list(plots = output_plot, msgs=  output_msg,  status = output_state) )
 }
 
 #' @author Andrea Argentini
@@ -1263,7 +1268,7 @@ select_samples_comparison <- function(test_parsing, pe, variable_names) {
     return(samples)
   }
   
-  # Get samples for Aleft and Bright
+  # Get samples for A left and Bright
   samples_A <- get_samples(test_parsing$Aleft, pe, variable_names)
   samples_B <- get_samples(test_parsing$Bright, pe, variable_names)
   

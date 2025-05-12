@@ -457,22 +457,18 @@ log_info('Completness Analysis...')
  
 # to do make in for loop for a set of variable 
 log_info('PCA Analysis...') 
-var_topca <- params$PCA_comparison 
- 
-l_pca <- generate_pca_plots(var_topca, pe, params, layer ='peptideNorm' ) 
-if (length(l_pca) == 0){ 
-  stop('Error during PCA generation ') 
-} 
-#ggplotly(  l_pca[[1]]) 
- 
-#htmltools::tagList(l_pca) 
-# saveRDS(l_pca, 'pcaPlot.Rds') 
- for (pca_plot in l_pca ){ 
-    
-  print(htmltools::tagList(ggplotly(pca_plot))) 
-   #ggplotly(pca_plot) 
- 
+
+res_pca <- generate_pca_plots(var_topca, pe, params, layer ='peptideNorm' ) 
+if (any (res_pca$status == 1) ){
+  log  (paste('PCA plots :  one splot will be skipped: ', res_pca$msgs[ which(res_pca$status==1)]))
 }
+l_pca <- res_pca$plots 
+ for (pca_plot in l_pca ){
+  if (is.null(pca_plot)){
+    next
+  }
+  print(htmltools::tagList(ggplotly(pca_plot)))
+ }
 
 ```
 
